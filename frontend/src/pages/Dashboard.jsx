@@ -127,22 +127,68 @@ export default function Dashboard() {
             </div>
           </section>
 
-          <section className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6">
+          <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-[#0f0f23]/80 border border-blue-500/10 rounded-lg p-4">
               <h3 className="text-slate-200 font-semibold mb-3">Status Distribution</h3>
-              <Bar data={statusChart} height={220} />
+              <div className="h-56 md:h-64">
+                <Bar
+                  data={statusChart}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: true, labels: { color: '#94a3b8' } } },
+                    scales: {
+                      x: { ticks: { color: '#94a3b8' }, grid: { display: false } },
+                      y: { beginAtZero: true, ticks: { color: '#94a3b8' }, grid: { color: 'rgba(59,130,246,0.1)' } }
+                    }
+                  }}
+                />
+              </div>
             </div>
             <div className="bg-[#0f0f23]/80 border border-blue-500/10 rounded-lg p-4">
               <h3 className="text-slate-200 font-semibold mb-3">Priority</h3>
-              <Doughnut data={priorityChart} />
+              <div className="h-56 md:h-64">
+                <Doughnut
+                  data={priorityChart}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', boxWidth: 14, font: { size: 12 } } } }
+                  }}
+                />
+              </div>
             </div>
             <div className="bg-[#0f0f23]/80 border border-blue-500/10 rounded-lg p-4">
               <h3 className="text-slate-200 font-semibold mb-3">Top Assignees</h3>
-              <Bar data={assigneeChart} options={{ indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } } }} height={220} />
+              <div className="h-56 md:h-64">
+                <Bar
+                  data={assigneeChart}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    plugins: { legend: { display: false } },
+                    scales: {
+                      x: { beginAtZero: true, ticks: { color: '#94a3b8' }, grid: { color: 'rgba(59,130,246,0.1)' } },
+                      y: { ticks: { color: '#94a3b8' }, grid: { display: false } }
+                    }
+                  }}
+                />
+              </div>
             </div>
             <div className="bg-[#0f0f23]/80 border border-blue-500/10 rounded-lg p-4">
               <h3 className="text-slate-200 font-semibold mb-3">Issue Types</h3>
-              <Pie data={typeChart} />
+              <div className="h-56 md:h-64">
+                <Pie
+                  data={typeChart}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8' } } }
+                  }}
+                />
+              </div>
             </div>
           </section>
 

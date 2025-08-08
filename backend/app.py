@@ -994,14 +994,14 @@ if __name__ == '__main__':
         initialize_managers()
         
         print("✅ Maya-Tone backend initialized successfully!")
-        print("📊 Dashboard API: http://localhost:5000/api/dashboard-stats")
-        print("💬 Chat API: http://localhost:5000/api/chat/history")
-        print("🎨 Canvas API: http://localhost:5000/api/canvas/data")
-        print("👤 Profile API: http://localhost:5000/api/user/profile")
-        print("🔍 Test API: http://localhost:5000/api/test")
+        print("📊 Dashboard API: http://localhost:4000/api/dashboard-stats")
+        print("💬 Chat API: http://localhost:4000/api/chat/history")
+        print("🎨 Canvas API: http://localhost:4000/api/canvas/data")
+        print("👤 Profile API: http://localhost:4000/api/user/profile")
+        print("🔍 Test API: http://localhost:4000/api/test")
         
         # Use SocketIO to run the app for real-time features
-        socketio.run(app, host='0.0.0.0', port=5000)
+        socketio.run(app, host='0.0.0.0', port=4000)
         
     except Exception as e:
         print(f"❌ Failed to initialize application: {e}")
