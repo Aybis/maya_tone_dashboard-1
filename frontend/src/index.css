@@ -1,0 +1,6 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root { height: 100%; }
+body { @apply font-sans bg-gradient-to-b from-[#1a1a2e] via-[#16213e] to-[#0f0f23] text-slate-200; }
