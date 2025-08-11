@@ -173,24 +173,46 @@ class JiraManager:
                 all_issues = []
             
             for issue in all_issues:
-                fields = issue['fields']
-                
-                # Status distribution
-                status = fields.get('status', {}).get('name', 'Unknown')
-                status_counts[status] += 1
-                
-                # Priority distribution
-                priority = fields.get('priority', {}).get('name', 'Unknown')
-                priority_counts[priority] += 1
-                
-                # Assignee distribution (top 10)
-                assignee = fields.get('assignee')
-                assignee_name = assignee.get('displayName', 'Unassigned') if assignee else 'Unassigned'
-                assignee_counts[assignee_name] += 1
-                
-                # Issue type distribution
-                issue_type = fields.get('issuetype', {}).get('name', 'Unknown')
-                type_counts[issue_type] += 1
+                try:
+                    fields = issue.get('fields', {})
+                    if not fields:
+                        continue
+                    
+                    # Status distribution - with null checks
+                    status_obj = fields.get('status')
+                    if status_obj and isinstance(status_obj, dict):
+                        status = status_obj.get('name', 'Unknown')
+                    else:
+                        status = 'Unknown'
+                    status_counts[status] += 1
+                    
+                    # Priority distribution - with null checks
+                    priority_obj = fields.get('priority')
+                    if priority_obj and isinstance(priority_obj, dict):
+                        priority = priority_obj.get('name', 'Medium')
+                    else:
+                        priority = 'Medium'
+                    priority_counts[priority] += 1
+                    
+                    # Assignee distribution (top 10) - with null checks
+                    assignee_obj = fields.get('assignee')
+                    if assignee_obj and isinstance(assignee_obj, dict):
+                        assignee_name = assignee_obj.get('displayName', 'Unassigned')
+                    else:
+                        assignee_name = 'Unassigned'
+                    assignee_counts[assignee_name] += 1
+                    
+                    # Issue type distribution - with null checks
+                    issue_type_obj = fields.get('issuetype')
+                    if issue_type_obj and isinstance(issue_type_obj, dict):
+                        issue_type = issue_type_obj.get('name', 'Unknown')
+                    else:
+                        issue_type = 'Unknown'
+                    type_counts[issue_type] += 1
+                    
+                except Exception as e:
+                    print(f"Error processing issue {issue.get('key', 'unknown')}: {e}")
+                    continue
             
             # Calculate trends (compare with previous period) - use safer query
             try:
@@ -201,16 +223,23 @@ class JiraManager:
                 print(f"Error getting previous period issues: {e}")
                 prev_month_count = 0
             
+            # Calculate growth rate safely
+            current_month_count = stats.get('created_this_month', 0)
+            if prev_month_count > 0:
+                growth_rate = ((current_month_count - prev_month_count) / prev_month_count) * 100
+            else:
+                growth_rate = 100 if current_month_count > 0 else 0
+            
             return {
                 'summary': {
-                    'my_open_tickets': stats['my_open'],
-                    'my_total_tickets': stats['my_total'],
-                    'reported_by_me': stats['reported_by_me'],
-                    'recent_activity': stats['recent_activity'],
-                    'high_priority': stats['high_priority'],
-                    'all_open_tickets': stats['all_open'],
-                    'created_this_month': stats['created_this_month'],
-                    'resolved_this_month': stats['resolved_this_month']
+                    'my_open_tickets': stats.get('my_open', 0),
+                    'my_total_tickets': stats.get('my_total', 0),
+                    'reported_by_me': stats.get('reported_by_me', 0),
+                    'recent_activity': stats.get('recent_activity', 0),
+                    'high_priority': stats.get('high_priority', 0),
+                    'all_open_tickets': stats.get('all_open', 0),
+                    'created_this_month': stats.get('created_this_month', 0),
+                    'resolved_this_month': stats.get('resolved_this_month', 0)
                 },
                 'distributions': {
                     'status': dict(status_counts.most_common()),
@@ -219,15 +248,17 @@ class JiraManager:
                     'types': dict(type_counts.most_common())
                 },
                 'trends': {
-                    'created_this_month': stats.get('created_this_month', 0),
+                    'created_this_month': current_month_count,
                     'created_last_month': prev_month_count,
-                    'growth_rate': ((stats.get('created_this_month', 0) - prev_month_count) / max(prev_month_count, 1)) * 100
+                    'growth_rate': round(growth_rate, 1)
                 },
                 'recent_tickets': self._format_tickets(detailed_data.get('recent_activity', [])[:10])
             }
             
         except Exception as e:
             print(f"Error getting dashboard stats: {e}")
+            import traceback
+            traceback.print_exc()
             return self._get_default_stats()
     
     def _format_tickets(self, issues: List[Dict]) -> List[Dict]:
@@ -994,14 +1025,14 @@ if __name__ == '__main__':
         initialize_managers()
         
         print("✅ Maya-Tone backend initialized successfully!")
-        print("📊 Dashboard API: http://localhost:5000/api/dashboard-stats")
-        print("💬 Chat API: http://localhost:5000/api/chat/history")
-        print("🎨 Canvas API: http://localhost:5000/api/canvas/data")
-        print("👤 Profile API: http://localhost:5000/api/user/profile")
-        print("🔍 Test API: http://localhost:5000/api/test")
+        print("📊 Dashboard API: http://localhost:4000/api/dashboard-stats")
+        print("💬 Chat API: http://localhost:4000/api/chat/history")
+        print("🎨 Canvas API: http://localhost:4000/api/canvas/data")
+        print("👤 Profile API: http://localhost:4000/api/user/profile")
+        print("🔍 Test API: http://localhost:4000/api/test")
         
         # Use SocketIO to run the app for real-time features
-        socketio.run(app, host='0.0.0.0', port=5000)
+        socketio.run(app, host='0.0.0.0', port=4000)
         
     except Exception as e:
         print(f"❌ Failed to initialize application: {e}")
