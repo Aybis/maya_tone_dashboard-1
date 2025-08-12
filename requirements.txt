@@ -4,5 +4,5 @@ requests
 python-dotenv
 openai
 flask-socketio
-
+jira
  

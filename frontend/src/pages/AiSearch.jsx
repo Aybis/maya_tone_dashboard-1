@@ -1,153 +1,247 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react';
+import { io } from 'socket.io-client';
+import { marked } from 'marked'; // Import library marked
 
-const exampleQueries = [
-  { label: 'My assigned tickets', query: 'Show me my tickets assigned to me' },
-  { label: 'High priority this week', query: 'High priority tickets created this week' },
-  { label: 'In progress tickets', query: 'All tickets in progress' },
-  { label: 'My reported open tickets', query: 'Tickets reported by me that are still open' },
-  { label: 'Updated today', query: 'Show me tickets updated today' },
-]
+// Helper component for user/AI avatars
+const Avatar = ({ sender }) => {
+  const isUser = sender === 'user';
+  return (
+    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold self-start ${isUser ? 'bg-blue-500' : 'bg-slate-600'}`}>
+      {isUser ? 'U' : 'M'}
+    </div>
+  );
+};
 
-export default function AiSearch() {
-  const [query, setQuery] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [results, setResults] = useState(null)
-  const [context, setContext] = useState(null)
+// Main Chat Component
+export default function AiChat() {
+  const [chats, setChats] = useState([]);
+  const [activeChatId, setActiveChatId] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const messagesEndRef = useRef(null);
+  const socketRef = useRef(null);
 
-  const performSearch = async (searchQuery) => {
-    setLoading(true)
-    setError('')
+  // Scroll to the bottom of the messages list
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(scrollToBottom, [messages]);
+
+  // Initialize and manage Socket.IO connection
+  useEffect(() => {
+    socketRef.current = io('http://localhost:4000');
+    socketRef.current.on('connect', () => console.log('Socket connected successfully'));
+    socketRef.current.on('new_message', (data) => {
+      if (data.chat_id === activeChatId) {
+        setMessages(prev => [...prev, { sender: data.sender, content: data.content }]);
+        setIsLoading(false);
+      }
+    });
+    return () => {
+      socketRef.current.disconnect();
+    };
+  }, [activeChatId]);
+
+  // Fetch chat history and initialize first chat session
+  useEffect(() => {
+    const initializeChat = async () => {
+      try {
+        const historyRes = await fetch('/api/chat/history');
+        const historyData = await historyRes.json();
+        setChats(historyData);
+
+        if (historyData.length > 0) {
+          setActiveChatId(historyData[0].id);
+        } else {
+          await createNewChat();
+        }
+      } catch (err) {
+        setError('Failed to initialize chat history.');
+      }
+    };
+    initializeChat();
+  }, []);
+
+  // Fetch messages for the active chat
+  useEffect(() => {
+    if (!activeChatId) return;
+
+    const fetchMessages = async () => {
+      setIsLoading(true);
+      try {
+        const res = await fetch(`/api/chat/${activeChatId}`);
+        const data = await res.json();
+        setMessages(data);
+        socketRef.current.emit('join_chat', { chat_id: activeChatId });
+      } catch (err) {
+        setError('Failed to fetch messages.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchMessages();
+  }, [activeChatId]);
+
+  const createNewChat = async () => {
     try {
-      const res = await fetch('/api/query', {
+        const res = await fetch('/api/chat/new', { method: 'POST' });
+        const data = await res.json();
+        setChats(prev => [{ id: data.chat_id, title: `Chat ${new Date().getHours()}:${new Date().getMinutes()}` }, ...prev]);
+        setActiveChatId(data.chat_id);
+        setMessages([]);
+    } catch (err) {
+        setError('Failed to create a new chat.');
+    }
+  };
+
+  // --- NEW --- Function to handle chat deletion
+  const handleDeleteChat = async (chatIdToDelete, e) => {
+    e.stopPropagation(); // Prevent selecting the chat when clicking the delete button
+
+    if (!window.confirm('Are you sure you want to permanently delete this chat?')) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/chat/${chatIdToDelete}/delete`, {
+        method: 'DELETE',
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to delete chat.');
+      }
+
+      const updatedChats = chats.filter(chat => chat.id !== chatIdToDelete);
+      setChats(updatedChats);
+
+      // If the deleted chat was the active one, switch to another chat
+      if (activeChatId === chatIdToDelete) {
+        if (updatedChats.length > 0) {
+          setActiveChatId(updatedChats[0].id);
+        } else {
+          await createNewChat(); // Create a new chat if no chats are left
+        }
+      }
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!newMessage.trim() || !activeChatId || isLoading) return;
+
+    const userMessage = { sender: 'user', content: newMessage };
+    setMessages(prev => [...prev, userMessage]);
+    const currentMessage = newMessage;
+    setNewMessage('');
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const res = await fetch(`/api/chat/${activeChatId}/ask`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: searchQuery, context })
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
-      if (data.error) throw new Error(data.error)
-      setResults(data)
-      setContext(data.context)
+        body: JSON.stringify({ message: currentMessage }),
+      });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.answer || 'Network response was not ok.');
+      }
     } catch (err) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
+      setError(`Failed to send message: ${err.message}`);
+      setNewMessage(currentMessage);
+      setMessages(prev => prev.filter(msg => msg !== userMessage));
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
-    <div className="max-w-5xl mx-auto px-4">
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-50 mb-1">AI Ticket Search</h1>
-        <p className="text-slate-400">Ask natural questions about your Jira tickets</p>
-      </header>
-
-      <div className="bg-[#0f0f23]/60 backdrop-blur rounded-xl p-6 md:p-8 shadow-lg border border-blue-500/10 mb-8">
-        <form
-          className="flex flex-col md:flex-row gap-4 mb-4"
-          onSubmit={(e) => { e.preventDefault(); if (query) performSearch(query) }}
+    <div className="flex h-[calc(100vh-100px)] bg-[#0f0f23]/60 text-slate-50">
+      {/* Sidebar for Chat History */}
+      <aside className="w-64 bg-slate-900/50 p-4 flex flex-col border-r border-blue-500/10">
+        <button
+          onClick={createNewChat}
+          className="w-full mb-4 px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-blue-700 text-white font-semibold shadow hover:-translate-y-1 transition"
         >
+          + New Chat
+        </button>
+        <div className="flex-1 overflow-y-auto">
+          {/* --- MODIFIED --- Mapped chats to include delete button */}
+          {chats.map(chat => (
+            <div
+              key={chat.id}
+              onClick={() => setActiveChatId(chat.id)}
+              className={`group flex items-center justify-between p-2 my-1 rounded cursor-pointer text-sm ${activeChatId === chat.id ? 'bg-blue-500/30 font-bold' : 'hover:bg-slate-700/50'}`}
+            >
+              <span className="truncate pr-2">{chat.title}</span>
+              <button
+                onClick={(e) => handleDeleteChat(chat.id, e)}
+                className="text-slate-500 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                aria-label="Delete chat"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            </div>
+          ))}
+        </div>
+      </aside>
+
+      {/* Main Chat Window */}
+      <main className="flex-1 flex flex-col p-4">
+        <div className="flex-1 overflow-y-auto mb-4 pr-4">
+          {messages.map((msg, index) => (
+            <div key={index} className={`flex items-start gap-3 my-4 ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}>
+              <Avatar sender={msg.sender} />
+              <div
+                className={`max-w-xl p-3 rounded-lg prose prose-invert prose-sm ${
+                  msg.sender === 'user'
+                    ? 'bg-blue-600'
+                    : 'bg-slate-700'
+                }`}
+                dangerouslySetInnerHTML={{ __html: marked.parse(msg.content || '') }}
+              />
+            </div>
+          ))}
+          {isLoading && (
+              <div className="flex items-start gap-3 my-4">
+                <Avatar sender="assistant" />
+                <div className="p-3 rounded-lg bg-slate-700">
+                    <div className="flex items-center justify-center space-x-2">
+                        <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></div>
+                        <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse [animation-delay:0.2s]"></div>
+                        <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse [animation-delay:0.4s]"></div>
+                    </div>
+                </div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+        {error && <p className="text-red-400 text-center text-sm mb-2">{error}</p>}
+        <form onSubmit={handleSendMessage} className="flex gap-4">
           <input
             type="text"
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            placeholder="Ask Maya anything about Jira..."
             className="flex-1 px-5 py-3 rounded-lg border-2 border-blue-500/20 bg-[#0f0f23]/80 text-slate-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-            placeholder="Ask me anything about your tickets..."
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            required
           />
           <button
             type="submit"
-            className="px-8 py-3 rounded-lg bg-gradient-to-r from-blue-500 to-blue-700 text-white font-semibold shadow hover:-translate-y-1 transition disabled:opacity-60"
-            disabled={loading}
+            disabled={isLoading || !newMessage.trim()}
+            className="px-8 py-3 rounded-lg bg-gradient-to-r from-blue-500 to-blue-700 text-white font-semibold shadow hover:-translate-y-1 transition disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {loading ? 'Searching...' : 'Search'}
+            Send
           </button>
         </form>
-
-        <div className="flex flex-wrap gap-2 mt-2 justify-center md:justify-start">
-          {exampleQueries.map((ex, i) => (
-            <button
-              key={i}
-              className="bg-[#0f0f23]/80 text-slate-400 px-4 py-2 rounded-full text-sm border border-blue-500/20 hover:bg-blue-500/10 hover:text-blue-400 transition"
-              onClick={() => { setQuery(ex.query); performSearch(ex.query) }}
-              type="button"
-            >
-              {ex.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {loading && (
-        <div className="text-center py-12 text-slate-400">
-          <div className="mx-auto mb-4 w-10 h-10 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
-          Searching tickets...
-        </div>
-      )}
-
-      {error && (
-        <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded text-center my-4">
-          Error: {error}
-        </div>
-      )}
-
-      {results && (
-        <div className="bg-[#0f0f23]/60 backdrop-blur rounded-xl p-6 md:p-8 shadow-lg border border-blue-500/10">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-            <div>
-              <h2 className="text-xl font-bold text-slate-50">{results.description}</h2>
-              <div className="text-slate-400 text-sm">{results.tickets.length} ticket{results.tickets.length !== 1 ? 's' : ''} found</div>
-            </div>
-          </div>
-          <div className="bg-[#0f0f23]/80 p-4 rounded mb-6 border-l-4 border-blue-500">
-            <div className="text-xs text-slate-400 uppercase font-semibold mb-2">Generated JQL Query:</div>
-            <div className="font-mono bg-black/60 text-slate-200 p-3 rounded text-sm overflow-x-auto">{results.jql}</div>
-          </div>
-
-          {results.tickets.length === 0 ? (
-            <div className="text-center py-12 text-slate-400">
-              <div className="text-5xl mb-2">⚠</div>
-              <h3 className="text-lg font-bold">No tickets found</h3>
-              <p>Try adjusting your search query or check if the filters are correct.</p>
-            </div>
-          ) : (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {results.tickets.map((ticket) => (
-                <div key={ticket.key} className="bg-[#0f0f23]/80 border border-blue-500/10 rounded-lg p-6 shadow hover:-translate-y-1 hover:border-blue-500 transition">
-                  <div className="flex justify-between items-start mb-4">
-                    <a href={ticket.url} target="_blank" rel="noopener noreferrer" className="text-blue-400 font-bold text-lg hover:underline">{ticket.key}</a>
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase
-                      ${ticket.status === 'To Do' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' : ''}
-                      ${ticket.status === 'In Progress' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : ''}
-                      ${ticket.status === 'Done' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : ''}
-                      ${ticket.status === 'Blocked' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : ''}
-                    `}>
-                      {ticket.status}
-                    </span>
-                  </div>
-                  <div className="font-semibold text-slate-50 mb-4">{ticket.summary}</div>
-                  <div className="grid grid-cols-2 gap-2 text-sm text-slate-400">
-                    <div><span className="font-medium text-slate-300">Assignee:</span> {ticket.assignee}</div>
-                    <div><span className="font-medium text-slate-300">Reporter:</span> {ticket.reporter}</div>
-                    <div>
-                      <span className="font-medium text-slate-300">Priority:</span>
-                      <span className={`ml-2 px-2 py-1 rounded text-xs font-semibold
-                        ${ticket.priority === 'High' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : ''}
-                        ${ticket.priority === 'Medium' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' : ''}
-                        ${ticket.priority === 'Low' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : ''}
-                      `}>
-                        {ticket.priority}
-                      </span>
-                    </div>
-                    <div><span className="font-medium text-slate-300">Updated:</span> {ticket.updated}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      </main>
     </div>
-  )
+  );
 }
