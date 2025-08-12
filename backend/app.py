@@ -24,7 +24,7 @@ except ImportError:
         import openai
         OPENAI_VERSION = "legacy"
     except ImportError:
-        print("OpenAI library tidak terinstall")
+        logging.error("OpenAI library tidak terinstall")
         OPENAI_VERSION = None
 
 # Import Jira library for CRUD operations
@@ -32,7 +32,7 @@ try:
     from jira import JIRA
     from jira.exceptions import JIRAError
 except ImportError:
-    print("Jira library tidak terinstall (pip install jira)")
+    logging.error("Jira library tidak terinstall (pip install jira)")
     JIRA = None
     JIRAError = None
 
@@ -42,7 +42,10 @@ load_dotenv()
 
 # --- Flask App Initialization ---
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "a-very-secret-key-for-session")
+secret_key = os.getenv("SECRET_KEY")
+if not secret_key:
+    raise RuntimeError("SECRET_KEY environment variable must be set and non-empty for secure session management.")
+app.secret_key = secret_key
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
@@ -163,7 +166,7 @@ class JiraManager:
             url = f"{self.base_url}/rest/api/2/search"
             params = {
                 'jql': jql, 'maxResults': max_results,
-                'fields': 'key,summary,status,assignee,reporter,created,updated,priority,issuetype,description,customfield_10561'
+                'fields': 'key,summary,status,assignee,reporter,created,updated,priority,issuetype,description'
             }
             response = self.session.get(url, params=params)
             response.raise_for_status()
@@ -964,7 +967,8 @@ if __name__ == '__main__':
         print(f"❤️  Health Check: http://localhost:4000/api/health")
         print(f"📅 Current Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         
-        socketio.run(app, host='0.0.0.0', port=4000, debug=True)
+        debug_mode = os.environ.get('FLASK_DEBUG', 'False').lower() in ('true', '1', 'yes')
+        socketio.run(app, host='0.0.0.0', port=4000, debug=debug_mode)
         
     except Exception as e:
         app.logger.error(f"❌ Failed to initialize application: {e}", exc_info=True)
