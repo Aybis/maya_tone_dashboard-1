@@ -1,0 +1,48 @@
+2025-08-12 16:30:16,496 INFO: Kolom 'pending_action' ditambahkan ke tabel chats.
+2025-08-12 16:30:16,496 INFO: ✅ Maya-Tone backend initialized successfully!
+2025-08-12 16:30:16,496 ERROR: ❌ Failed to initialize application: The Werkzeug web server is not designed to run in production. Pass allow_unsafe_werkzeug=True to the run() method to disable this error.
+Traceback (most recent call last):
+  File "/Users/abdulm075523/nevertooldtolearn/jira-ai/backend/app.py", line 971, in <module>
+    socketio.run(app, host='0.0.0.0', port=4000, debug=debug_mode)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/abdulm075523/nevertooldtolearn/jira-ai/venv/lib/python3.13/site-packages/flask_socketio/__init__.py", line 650, in run
+    raise RuntimeError('The Werkzeug web server is not '
+    ...<2 lines>...
+                       'run() method to disable this error.')
+RuntimeError: The Werkzeug web server is not designed to run in production. Pass allow_unsafe_werkzeug=True to the run() method to disable this error.
+2025-08-12 16:31:18,620 INFO: ✅ Maya-Tone backend initialized successfully!
+2025-08-12 16:42:36,893 ERROR: Exception on / [GET]
+Traceback (most recent call last):
+  File "/Users/abdulm075523/nevertooldtolearn/jira-ai/venv/lib/python3.13/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/Users/abdulm075523/nevertooldtolearn/jira-ai/venv/lib/python3.13/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/Users/abdulm075523/nevertooldtolearn/jira-ai/venv/lib/python3.13/site-packages/flask_cors/extension.py", line 176, in wrapped_function
+    return cors_after_request(app.make_response(f(*args, **kwargs)))
+                                                ~^^^^^^^^^^^^^^^^^
+  File "/Users/abdulm075523/nevertooldtolearn/jira-ai/venv/lib/python3.13/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/Users/abdulm075523/nevertooldtolearn/jira-ai/venv/lib/python3.13/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/Users/abdulm075523/nevertooldtolearn/jira-ai/backend/app.py", line 894, in index
+    return render_template('index.html')
+  File "/Users/abdulm075523/nevertooldtolearn/jira-ai/venv/lib/python3.13/site-packages/flask/templating.py", line 149, in render_template
+    template = app.jinja_env.get_or_select_template(template_name_or_list)
+  File "/Users/abdulm075523/nevertooldtolearn/jira-ai/venv/lib/python3.13/site-packages/jinja2/environment.py", line 1087, in get_or_select_template
+    return self.get_template(template_name_or_list, parent, globals)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/abdulm075523/nevertooldtolearn/jira-ai/venv/lib/python3.13/site-packages/jinja2/environment.py", line 1016, in get_template
+    return self._load_template(name, globals)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "/Users/abdulm075523/nevertooldtolearn/jira-ai/venv/lib/python3.13/site-packages/jinja2/environment.py", line 975, in _load_template
+    template = self.loader.load(self, name, self.make_globals(globals))
+  File "/Users/abdulm075523/nevertooldtolearn/jira-ai/venv/lib/python3.13/site-packages/jinja2/loaders.py", line 126, in load
+    source, filename, uptodate = self.get_source(environment, name)
+                                 ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "/Users/abdulm075523/nevertooldtolearn/jira-ai/venv/lib/python3.13/site-packages/flask/templating.py", line 65, in get_source
+    return self._get_source_fast(environment, template)
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/abdulm075523/nevertooldtolearn/jira-ai/venv/lib/python3.13/site-packages/flask/templating.py", line 99, in _get_source_fast
+    raise TemplateNotFound(template)
+jinja2.exceptions.TemplateNotFound: index.html

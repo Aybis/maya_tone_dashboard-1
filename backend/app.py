@@ -552,11 +552,18 @@ def create_new_chat():
     conn = sqlite3.connect('maya_tone.db')
     c = conn.cursor()
     chat_id = str(uuid4())
+    # Generate a friendlier random title (two words + time)
+    WORDS = [
+        'Orion','Lumen','Echo','Nova','Aster','Nimbus','Quartz','Atlas','Zenith','Pulse',
+        'Vertex','Cipher','Delta','Nimbus','Photon','Pulse','Vortex','Comet','Helix','Matrix'
+    ]
+    import random
+    title = f"{random.choice(WORDS)} {random.choice(WORDS)} {datetime.now().strftime('%H:%M')}"  # e.g. "Orion Helix 14:22"
     c.execute('INSERT INTO chats (id, title, created_at, updated_at, user_id) VALUES (?, ?, ?, ?, ?)',
-              (chat_id, f"Chat {datetime.now().strftime('%H:%M')}", datetime.now(), datetime.now(), 'user'))
+              (chat_id, title, datetime.now(), datetime.now(), 'user'))
     conn.commit()
     conn.close()
-    return jsonify({'chat_id': chat_id})
+    return jsonify({'chat_id': chat_id, 'title': title})
 
 @app.route('/api/chat/history')
 def get_chat_history():
@@ -826,6 +833,106 @@ def api_ask_chat(chat_id):
 
             if tool_error: 
                 return send_response(f"❌ Error: {tool_error}")
+
+            # Custom markdown formatting for certain functions (bypass second OpenAI summarization)
+            def format_issues_markdown(issues):
+                if not issues:
+                    return "### 📋 Daftar Issue\nTidak ada issue ditemukan."
+                from collections import Counter
+                status_counter = Counter()
+                priority_counter = Counter()
+                assignee_counter = Counter()
+                oldest = None
+                newest = None
+                oldest_key = newest_key = None
+                lines = [f"## 📋 Daftar Issue (Total: {len(issues)})\n"]
+                for idx, issue in enumerate(issues, start=1):
+                    fields = issue.get('fields', {})
+                    key = issue.get('key','?')
+                    summary = fields.get('summary','(no summary)')
+                    status = (fields.get('status') or {}).get('name','Unknown')
+                    assignee = (fields.get('assignee') or {}).get('displayName','Unassigned')
+                    priority = (fields.get('priority') or {}).get('name','Medium')
+                    created = fields.get('created','')[:10]
+                    updated = fields.get('updated','')[:10]
+                    lines.append(f"{idx}. **[{key}]** - {summary}\n   • Status: {status}\n   • Assignee: {assignee}\n   • Priority: {priority}\n   • Created: {created}\n   • Updated: {updated}\n")
+                    status_counter[status]+=1
+                    priority_counter[priority]+=1
+                    assignee_counter[assignee]+=1
+                    # track oldest/newest by created/updated
+                    try:
+                        from datetime import datetime as _dt
+                        created_dt = _dt.strptime(created, '%Y-%m-%d') if created else None
+                        updated_dt = _dt.strptime(updated, '%Y-%m-%d') if updated else None
+                        if created_dt and (oldest is None or created_dt < oldest):
+                            oldest = created_dt; oldest_key = key
+                        if updated_dt and (newest is None or updated_dt > newest):
+                            newest = updated_dt; newest_key = key
+                    except Exception:
+                        pass
+                def fmt_counter(counter):
+                    return ', '.join(f"{k}: {v}" for k,v in counter.most_common()) or '-'
+                lines.append("### 🧮 Ringkasan")
+                lines.append(f"- Total issues: **{len(issues)}**")
+                lines.append(f"- Distinct assignees: **{len(assignee_counter)}**")
+                lines.append(f"- Status breakdown: {fmt_counter(status_counter)}")
+                lines.append(f"- Priority breakdown: {fmt_counter(priority_counter)}")
+                if oldest:
+                    lines.append(f"- Oldest created: {oldest.date()} ({oldest_key})")
+                if newest:
+                    lines.append(f"- Most recently updated: {newest.date()} ({newest_key})")
+                top_status = status_counter.most_common(1)[0][0] if status_counter else None
+                high_priorities = sum(v for k,v in priority_counter.items() if k.lower().startswith('p0') or k.lower() in ('high','highest'))
+                lines.append("\n### 💡 Insight")
+                if top_status:
+                    lines.append(f"- Status paling umum: **{top_status}** menunjukkan area fokus saat ini.")
+                lines.append(f"- Jumlah issue prioritas tinggi (P0/High): **{high_priorities}**")
+                if newest and oldest:
+                    age_days = (newest - oldest).days
+                    lines.append(f"- Rentang umur issue (oldest to newest update): **{age_days} hari**")
+                lines.append("\n> Penjelasan: Daftar di atas tersusun terurut dan ringkasan memberikan distribusi untuk membantu prioritisasi.")
+                return "\n".join(lines)
+
+            def format_worklogs_markdown(worklogs):
+                if not worklogs:
+                    return "### ⏱️ Worklog\nTidak ada worklog ditemukan."
+                total_hours = 0.0
+                by_issue = {}
+                lines = [f"## ⏱️ Worklog (Total entri: {len(worklogs)})\n"]
+                for idx, w in enumerate(worklogs, start=1):
+                    issue_key = w.get('issueKey') or w.get('issue_key')
+                    summary = w.get('issueSummary') or w.get('summary','')
+                    hours = 0.0
+                    # timeSpent maybe '2h' or '1h 30m'
+                    ts = w.get('timeSpent') or w.get('time_spent') or ''
+                    import re
+                    h_match = re.search(r'(\d+(?:\.\d+)?)h', ts)
+                    m_match = re.search(r'(\d+)m', ts)
+                    if h_match: hours += float(h_match.group(1))
+                    if m_match: hours += float(m_match.group(1))/60.0
+                    total_hours += hours
+                    by_issue[issue_key] = by_issue.get(issue_key, 0)+hours
+                    started = w.get('started','')[:10]
+                    lines.append(f"{idx}. **[{issue_key}]** {summary}\n   • Date: {started}\n   • Duration: {hours:.2f}h\n   • Comment: {w.get('comment','-')}\n")
+                lines.append("### 🧮 Ringkasan")
+                lines.append(f"- Total jam: **{total_hours:.2f}h**")
+                lines.append(f"- Issue terbanyak: {max(by_issue, key=by_issue.get)} ({max(by_issue.values()):.2f}h)" if by_issue else "- Issue terbanyak: -")
+                lines.append(f"- Rata-rata per worklog: {(total_hours/len(worklogs)):.2f}h")
+                lines.append("\n### 💡 Insight\n- Distribusi jam membantu identifikasi fokus kerja. Periksa apakah jam seimbang antar issue prioritas.")
+                return "\n".join(lines)
+
+            if function_name == 'get_issues':
+                try:
+                    markdown = format_issues_markdown(tool_result_data or [])
+                    return send_response(markdown)
+                except Exception as e:
+                    app.logger.error(f"Formatting issues markdown failed: {e}")
+            if function_name == 'get_worklogs':
+                try:
+                    markdown = format_worklogs_markdown(tool_result_data or [])
+                    return send_response(markdown)
+                except Exception as e:
+                    app.logger.error(f"Formatting worklogs markdown failed: {e}")
 
             # FIXED: Proper message structure for OpenAI API
             summarizer_messages = api_call_history + [
