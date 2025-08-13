@@ -53,3 +53,22 @@ def create_app():
         return jsonify({'status':'healthy','timestamp': datetime.now().isoformat()})
 
     return app
+
+# Socket.IO event handlers (placed after app creation so 'socketio' is bound)
+@socketio.on('join_chat')
+def handle_join_chat(data):
+    """Client requests to join a chat room to receive real-time messages.
+
+    Frontend emits: socket.emit('join_chat', { chat_id })
+    We join a room named after chat_id so assistant replies can be room-targeted.
+    """
+    try:
+        from flask import request as flask_request
+        chat_id = (data or {}).get('chat_id')
+        if not chat_id:
+            return
+        from flask_socketio import join_room
+        join_room(chat_id)
+    except Exception:
+        # Best-effort; avoid crashing on bad payload
+        pass

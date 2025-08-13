@@ -16,7 +16,7 @@ const Avatar = ({ sender }) => (
 );
 
 export default function Canvas() {
-  const { activeChatId, setActiveChatHasMessages, setActiveChatId } = useChatContext();
+  const { activeChatId, setActiveChatHasMessages, setActiveChatId, refreshChats } = useChatContext();
   const { chatId } = useParams();
   const navigate = useNavigate();
   const [messages, setMessages] = useState([]);
@@ -53,12 +53,23 @@ export default function Canvas() {
     if (!activeChatId) return;
     socketRef.current = io('http://localhost:4000');
     socketRef.current.emit('join_chat', { chat_id: activeChatId });
-    socketRef.current.on('new_message', (data) => {
+  socketRef.current.on('new_message', (data) => {
       if (data.chat_id === activeChatId) {
-        setMessages(prev => [...prev, { sender: data.sender, content: data.content }]);
+        setMessages(prev => {
+          if (data.sender === 'assistant') {
+            const lastAssistant = [...prev].reverse().find(m => m.sender === 'assistant');
+            if (lastAssistant && lastAssistant.content === data.content) return prev; // dedupe
+          }
+            return [...prev, { sender: data.sender, content: data.content }];
+        });
         setLoading(false);
       }
     });
+  // Streaming events
+  socketRef.current.on('assistant_start', ({ chat_id }) => { if (chat_id === activeChatId) { setLoading(true); setMessages(prev => [...prev, { sender: 'assistant', content: '' }]); }});
+  socketRef.current.on('assistant_delta', ({ chat_id, delta }) => { if (chat_id === activeChatId) { setMessages(prev => { const copy = [...prev]; for (let i=copy.length-1;i>=0;i--){ if(copy[i].sender==='assistant'){ copy[i]={...copy[i], content:(copy[i].content||'')+delta}; break;} } return copy; }); }});
+  socketRef.current.on('assistant_end', ({ chat_id, content }) => { if (chat_id === activeChatId) { setMessages(prev => { const copy=[...prev]; for (let i=copy.length-1;i>=0;i--){ if(copy[i].sender==='assistant'){ copy[i]={...copy[i], content}; break;} } return copy; }); setLoading(false); setActiveChatHasMessages(true); }});
+  socketRef.current.on('assistant_error', ({ chat_id, error }) => { if (chat_id === activeChatId) { setError(error); setLoading(false); }});
     return () => { socketRef.current?.disconnect(); };
   }, [activeChatId]);
 
@@ -66,15 +77,32 @@ export default function Canvas() {
 
   const send = async (e) => {
     e.preventDefault();
-    if (!input.trim() || !activeChatId || loading) return;
-    const msg = { sender: 'user', content: input };
-    setMessages(prev => [...prev, msg]);
+    if (!input.trim() || loading) return;
     const content = input; setInput(''); setLoading(true); setError('');
+    // If no active chat yet (user just on /canvas), create + ask in one go
+  if (!activeChatId) {
+      try {
+    const res = await fetch('/api/chat/ask_new', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: content }) });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.answer || 'Fail');
+        setMessages([{ sender: 'user', content }, { sender: 'assistant', content: data.answer }]);
+        setActiveChatId(data.chat_id);
+        setActiveChatHasMessages(true);
+        refreshChats?.();
+        navigate(`/chat/${data.chat_id}`, { replace: true });
+      } catch (err) {
+        setError('Failed to start chat');
+      } finally { setLoading(false); }
+      return; }
+    // Existing chat flow
+    const msg = { sender: 'user', content };
+    setMessages(prev => [...prev, msg]);
     try {
-      const res = await fetch(`/api/chat/${activeChatId}/ask`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: content }) });
-      if (!res.ok) throw new Error('Fail');
-  setActiveChatHasMessages(true);
-    } catch (e) { setError('Failed to send'); setLoading(false); }
+      await fetch(`/api/chat/${activeChatId}/ask_stream`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: content }) });
+      // Stream events will handle state updates
+    } catch (err) {
+      setError('Failed to send'); setLoading(false);
+    }
   };
 
   // Extract latest assistant message containing a markdown table (| ... |) to show on canvas; ignore pure text
@@ -153,7 +181,6 @@ export default function Canvas() {
   }, [chartSpec]);
 
   const derivedFilterChoices = useMemo(() => {
-    // Prefer distincts if model provided (backend added 'distincts')
     const distincts = chartSpec?.distincts || chartSpec?.meta?.distincts;
     if (distincts) {
       return {
@@ -162,15 +189,21 @@ export default function Canvas() {
         project: distincts.project || []
       };
     }
-    const base = { status: [], assignee: [], project: [] };
-    const metaF = chartSpec?.meta?.filters || {};
-    if (chartSpec?.meta?.group_by === 'status' && (!metaF.status || !metaF.status.length)) {
-      base.status = chartSpec.labels || [];
-    } else base.status = metaF.status || [];
-    base.assignee = metaF.assignee || [];
-    base.project = metaF.project || [];
-    return base;
+    return {
+      status: chartSpec?.meta?.group_by === 'status' ? (chartSpec?.labels || []) : (chartSpec?.meta?.filters?.status || []),
+      assignee: chartSpec?.meta?.group_by === 'assignee' ? (chartSpec?.labels || []) : (chartSpec?.meta?.filters?.assignee || []),
+      project: chartSpec?.meta?.group_by === 'project' ? (chartSpec?.labels || []) : (chartSpec?.meta?.filters?.project || [])
+    };
   }, [chartSpec]);
+
+  // When a new AI chart (chartSpec) appears and no insight line present, prepare an insight prompt automatically
+  useEffect(() => {
+    if (!chartSpec) return;
+    if (!autoInsight) return;
+    const content = latestAssistant?.content || '';
+    if (/Insight:/i.test(content)) return; // already has insight
+    setInput(prev => prev || `Berikan insight singkat (1-2 kalimat) tentang distribusi ${chartSpec.meta?.group_by || 'data'} di atas. Mulai langsung tanpa salam.`);
+  }, [chartSpec, autoInsight, latestAssistant]);
 
   const updateForm = (field, value) => {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -219,7 +252,7 @@ export default function Canvas() {
 
   const [canvasWidth, setCanvasWidth] = useState(0.55); // fraction of container (slightly smaller chart pane)
   const [chartSize, setChartSize] = useState('md'); // sm | md | lg
-  const chartSizeClass = chartSize === 'sm' ? 'max-w-[380px]' : chartSize === 'lg' ? 'max-w-[860px]' : 'max-w-[560px]';
+  const chartSizeClass = chartSize === 'sm' ? 'max-w-[380px]' : chartSize === 'lg' ? 'max-w-[860px]' : 'max-w-[640px]';
   const dragRef = useRef(null);
   const containerRef = useRef(null);
 
@@ -251,6 +284,9 @@ export default function Canvas() {
           {latestAssistant ? (
             <div className="bg-[#0f0f23]/70 border border-blue-500/10 rounded-lg p-4 space-y-4">
               <h2 className="text-slate-200 font-semibold">Latest Output</h2>
+              {loading && !chartComponent && (
+                <div className="text-[13px] text-slate-500 italic animate-pulse">Thinking…</div>
+              )}
               {chartComponent && (
                 <div className="space-y-4">
                   <div className={`w-full mx-auto ${chartSizeClass} transition-all duration-300 bg-slate-900/40 rounded-lg p-4 shadow-inner flex items-center justify-center`}>

@@ -10,13 +10,14 @@ export function ChatProvider({ children }) {
   const [activeChatHasMessages, setActiveChatHasMessages] = useState(false);
 
   const createNewChat = useCallback(async () => {
+    // Explicit manual creation (still available if needed elsewhere)
     try {
-  const res = await fetch('/api/chat/new', { method: 'POST' });
-  const data = await res.json();
-  const title = data.title || `Chat ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-  setChats(prev => [{ id: data.chat_id, title }, ...prev]);
-  setActiveChatId(data.chat_id);
-  return data.chat_id;
+      const res = await fetch('/api/chat/new', { method: 'POST' });
+      const data = await res.json();
+      const title = data.title || `Chat ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+      setChats(prev => [{ id: data.chat_id, title }, ...prev]);
+      setActiveChatId(data.chat_id);
+      return data.chat_id;
     } catch (e) {
       setError('Failed to create chat');
     }
@@ -30,9 +31,6 @@ export function ChatProvider({ children }) {
       setChats(data);
       if (!activeChatId && data.length) {
         setActiveChatId(data[0].id);
-      } else if (!data.length) {
-        // auto create initial chat if none exist
-        await createNewChat();
       }
     } catch (e) {
       setError('Failed to load chat history');

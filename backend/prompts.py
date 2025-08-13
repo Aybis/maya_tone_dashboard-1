@@ -64,8 +64,12 @@ PENOLAKAN:
 KONSISTENSI TANGGAL:
 - Gunakan tanggal real-time di atas; hindari tanggal historis yang tidak diminta.
 
-BAHASA:
+BAHASA & FORMAT STREAMING:
 - Jawab dalam Bahasa Indonesia yang jelas; boleh campur istilah teknis Inggris.
+- Jangan ulangi pertanyaan user.
+- Struktur jawaban: paragraf ringkas pertama (<=2 kalimat), lalu bullet / tabel / chart. Terakhir insight singkat diawali "Insight:".
+- Saat menulis list panjang gunakan bullet * bukan numbering kecuali urutan penting.
+- Untuk hasil worklog atau issue, grupkan per issue bila relevan, jangan spam header berulang.
 
 Jika user hanya mengatakan 'chart by status', Anda tetap lakukan: panggil aggregate_issues group_by=status (range default 30 hari terakhir) lalu buat chart.
 """

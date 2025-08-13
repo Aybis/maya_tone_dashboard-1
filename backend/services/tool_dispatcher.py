@@ -51,7 +51,7 @@ def execute(function_name: str, args: Dict) -> Tuple[Any, str]:
             if action == 'update':
                 issue_key = details.pop('issue_key', None)
                 return jira_crud.update_issue(issue_key, details)
-            if action == 'delete': return jira_crud.delete_issue(details.get('issue_key'))
+            if action == 'delete': return jira_crud.delete_issue(details.get('issue_key',))
         if function_name == 'aggregate_issues':
             return aggregate_issues(jira_manager(), **args)
         return None, f"Fungsi '{function_name}' tidak ditemukan."
