@@ -131,8 +131,26 @@ def update_issue(issue_key, updates: Dict[str, Any]):
     client = jira_client();
     if not client: return None, "Jira client tidak terinisialisasi."
     try:
-        issue = client.issue(issue_key); issue.update(fields=updates); return {"key": issue_key}, None
-    except Exception as e: return None, f"Gagal update issue: {e}"
+        field_updates = {}
+        for key, value in updates.items():
+            if key == 'assignee_name':
+                # Map pseudo field 'assignee_name' to real Jira 'assignee'
+                if value is None:
+                    field_updates['assignee'] = None  # Unassign
+                else:
+                    field_updates['assignee'] = {"name": value}
+            elif key == 'priority_name':
+                field_updates['priority'] = {"name": value}
+            elif key == 'issuetype_name':
+                field_updates['issuetype'] = {"name": value}
+            else:
+                field_updates[key] = value
+        
+        issue = client.issue(issue_key)
+        issue.update(fields=field_updates)
+        return {"key": issue_key}, None
+    except Exception as e: 
+        return None, f"Gagal update issue: {e}"
 
 def delete_issue(issue_key):
     client = jira_client();
