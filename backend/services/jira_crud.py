@@ -1,6 +1,6 @@
-"""Jira CRUD & worklog helper functions (extracted from monolithic app)."""
+"""Jira CRUD & worklog helper functions (now using session credentials)."""
 from datetime import datetime
-from ..config import JIRA_BASE_URL, JIRA_USERNAME, JIRA_PASSWORD
+from ..utils.session_jira import get_session_credentials
 from typing import Dict, Any
 try:
     from jira import JIRA  # type: ignore
@@ -8,10 +8,11 @@ except ImportError:
     JIRA = None
 
 def jira_client():
-    if not JIRA or not all([JIRA_BASE_URL, JIRA_USERNAME, JIRA_PASSWORD]):
+    base_url, username, password = get_session_credentials()
+    if not JIRA or not all([base_url, username, password]):
         return None
     try:
-        return JIRA(server=JIRA_BASE_URL, basic_auth=(JIRA_USERNAME, JIRA_PASSWORD))
+        return JIRA(server=base_url, basic_auth=(username, password))
     except Exception:
         return None
 

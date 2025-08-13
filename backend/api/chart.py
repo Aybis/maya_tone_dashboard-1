@@ -8,11 +8,8 @@ chart_bp = Blueprint('chart', __name__)
 _manager = None
 
 def _mgr():
-    """Singleton JiraManager accessor (lazy init)."""
-    global _manager
-    if _manager is None:
-        _manager = JiraManager(JIRA_BASE_URL, JIRA_USERNAME, JIRA_PASSWORD)
-    return _manager
+    """JiraManager using session credentials."""
+    return JiraManager()
 
 @chart_bp.route('/api/chart/aggregate', methods=['POST'])
 def aggregate():

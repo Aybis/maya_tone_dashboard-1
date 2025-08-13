@@ -8,11 +8,8 @@ dashboard_bp = Blueprint('dashboard', __name__)
 _manager = None
 
 def _mgr():
-    """Lazy singleton JiraManager."""
-    global _manager
-    if _manager is None:
-        _manager = JiraManager(JIRA_BASE_URL, JIRA_USERNAME, JIRA_PASSWORD)
-    return _manager
+    """JiraManager using session credentials."""
+    return JiraManager()
 
 @dashboard_bp.route('/api/dashboard-stats')
 def stats():

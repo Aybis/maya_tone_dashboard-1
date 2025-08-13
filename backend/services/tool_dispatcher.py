@@ -34,7 +34,9 @@ def execute(function_name: str, args: Dict) -> Tuple[Any, str]:
         if function_name == 'get_issue_types':
             return jira_crud.get_issue_types(**args)
         if function_name == 'get_worklogs':
-            args['username'] = JIRA_USERNAME
+            from ..utils.session_jira import get_session_credentials
+            _, session_username, _ = get_session_credentials()
+            args['username'] = session_username or args.get('username', 'unknown')
             return jira_crud.get_worklogs(**args)
         if function_name == 'create_worklog':
             return jira_crud.create_worklog(**args)

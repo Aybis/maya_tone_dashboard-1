@@ -1,3 +1,6 @@
 .venv/
 *.env
 *old
+*__pycache__/
+*maya_tone.db
+.vscode/

@@ -3,20 +3,34 @@ from collections import Counter
 from requests.auth import HTTPBasicAuth
 import requests
 from typing import List, Dict, Any, Optional
+from .utils.session_jira import get_session_credentials
 
 class JiraManager:
-    def __init__(self, base_url: str, username: str, password: str):
-        self.base_url = base_url.rstrip('/')
-        self.session = requests.Session()
-        self.session.auth = HTTPBasicAuth(username, password)
+    def __init__(self, base_url: str = None, username: str = None, password: str = None):
+        # Try session credentials first, fallback to params
+        session_url, session_user, session_pass = get_session_credentials()
+        
+        self.base_url = (session_url or base_url or '').rstrip('/')
+        self.username = session_user or username
+        self.password = session_pass or password
+        
+        if self.base_url and self.username and self.password:
+            self.session = requests.Session()
+            self.session.auth = HTTPBasicAuth(self.username, self.password)
+        else:
+            self.session = None
 
     def get_current_user(self) -> Dict[str, Any]:
+        if not self.session:
+            return {}
         try:
             r = self.session.get(f"{self.base_url}/rest/api/2/myself"); r.raise_for_status(); return r.json()
         except Exception:
             return {}
 
     def search_issues(self, jql: str, max_results: int = 50) -> List[Dict[str, Any]]:
+        if not self.session:
+            return []
         try:
             params = {'jql': jql, 'maxResults': max_results,
                       'fields': 'key,summary,status,assignee,reporter,created,updated,priority,issuetype,description,project'}
