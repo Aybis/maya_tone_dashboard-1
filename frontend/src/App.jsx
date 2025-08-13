@@ -1,9 +1,10 @@
 import React from 'react';
-import { Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, NavLink, useNavigate, useLocation, useParams } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import AiSearch from './pages/AiSearch';
 import Canvas from './pages/Canvas';
 import { ChatProvider, useChatContext } from './context/ChatContext';
+import { DashboardProvider } from './context/DashboardContext';
 
 function Sidebar() {
   const { chats, activeChatId, setActiveChatId, createNewChat, deleteChat, renameChat, loadingChats, activeChatHasMessages } = useChatContext();
@@ -20,8 +21,8 @@ function Sidebar() {
           <nav className="flex flex-col gap-1">
             <NavLink to="/" end className={({isActive}) => `px-3 py-2 rounded-md text-sm font-medium ${isActive ? 'bg-blue-500/20 text-blue-300' : 'text-slate-400 hover:text-blue-300 hover:bg-blue-500/10'}`}>Dashboard</NavLink>
             <button
-              onClick={async () => { const id = await createNewChat(); if (id) navigate('/canvas'); }}
-              className={`text-left px-3 py-2 rounded-md text-sm font-medium w-full ${location.pathname === '/canvas' && !activeChatHasMessages ? 'bg-blue-500/20 text-blue-300' : 'text-slate-400 hover:text-blue-300 hover:bg-blue-500/10'}`}
+              onClick={async () => { const id = await createNewChat(); if (id) navigate(`/chat/${id}`); }}
+              className={`text-left px-3 py-2 rounded-md text-sm font-medium w-full ${location.pathname.startsWith('/chat') && !activeChatHasMessages ? 'bg-blue-500/20 text-blue-300' : 'text-slate-400 hover:text-blue-300 hover:bg-blue-500/10'}`}
             >Canvas</button>
             <NavLink to="/ai-search" className={({isActive}) => `px-3 py-2 rounded-md text-sm font-medium ${isActive ? 'bg-blue-500/20 text-blue-300' : 'text-slate-400 hover:text-blue-300 hover:bg-blue-500/10'}`}>AI Search</NavLink>
           </nav>
@@ -34,8 +35,8 @@ function Sidebar() {
           <div className="space-y-1 max-h-72 overflow-y-auto pr-1">
             {loadingChats && <div className="text-slate-500 text-xs">Loading...</div>}
             {chats.map(c => (
-              <div key={c.id} className={`group flex items-center gap-1 rounded ${activeChatId === c.id && activeChatHasMessages ? 'bg-blue-500/30' : 'hover:bg-blue-500/10'}`}> 
-                <button onClick={() => { setActiveChatId(c.id); navigate('/canvas'); }} className={`flex-1 text-left px-3 py-2 text-xs truncate ${activeChatId === c.id && activeChatHasMessages ? 'text-blue-200' : 'text-slate-400 group-hover:text-blue-200'}`}>{c.title}</button>
+              <div key={c.id} className={`group flex items-center gap-1 rounded ${activeChatId === c.id ? 'bg-blue-500/30' : 'hover:bg-blue-500/10'}`}> 
+                <button onClick={() => { setActiveChatId(c.id); navigate(`/chat/${c.id}`); }} className={`flex-1 text-left px-3 py-2 text-xs truncate ${activeChatId === c.id ? 'text-blue-200' : 'text-slate-400 group-hover:text-blue-200'}`}>{c.title}</button>
                 <button title="Rename" onClick={() => { const t = prompt('New title', c.title); if (t) renameChat(c.id, t); }} className="opacity-0 group-hover:opacity-100 text-[10px] text-slate-400 hover:text-blue-300 pr-1">✎</button>
                 <button title="Delete" onClick={() => { if (confirm('Delete this chat?')) deleteChat(c.id); }} className="opacity-0 group-hover:opacity-100 text-[10px] text-slate-400 hover:text-red-400 px-1">✕</button>
               </div>
@@ -52,16 +53,19 @@ function Sidebar() {
 export default function App() {
   return (
     <ChatProvider>
-      <div className="flex min-h-screen">
-        <Sidebar />
-        <main className="flex-1 min-h-screen overflow-y-auto">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/canvas" element={<Canvas />} />
-            <Route path="/ai-search" element={<AiSearch />} />
-          </Routes>
-        </main>
-      </div>
+      <DashboardProvider>
+        <div className="flex min-h-screen">
+          <Sidebar />
+          <main className="flex-1 min-h-screen overflow-y-auto">
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/canvas" element={<Canvas />} />
+              <Route path="/chat/:chatId" element={<Canvas />} />
+              <Route path="/ai-search" element={<AiSearch />} />
+            </Routes>
+          </main>
+        </div>
+      </DashboardProvider>
     </ChatProvider>
   );
 }

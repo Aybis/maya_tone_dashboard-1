@@ -46,3 +46,5 @@ Traceback (most recent call last):
   File "/Users/abdulm075523/nevertooldtolearn/jira-ai/venv/lib/python3.13/site-packages/flask/templating.py", line 99, in _get_source_fast
     raise TemplateNotFound(template)
 jinja2.exceptions.TemplateNotFound: index.html
+2025-08-12 17:12:19,376 INFO: ✅ Maya-Tone backend initialized successfully!
+2025-08-12 17:29:36,800 INFO: ✅ Maya-Tone backend initialized successfully!

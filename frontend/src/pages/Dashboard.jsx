@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useMemo } from 'react'
 import { Bar, Doughnut, Pie } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
@@ -9,6 +9,7 @@ import {
   Tooltip,
   Legend
 } from 'chart.js'
+import { useDashboard } from '../context/DashboardContext'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Legend)
 
@@ -22,27 +23,7 @@ function SummaryCard({ title, value }) {
 }
 
 export default function Dashboard() {
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    let ignore = false
-    const load = async () => {
-      try {
-        const res = await fetch('/api/dashboard-stats')
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const json = await res.json()
-        if (!ignore) setData(json)
-      } catch (e) {
-        if (!ignore) setError(e.message)
-      } finally {
-        if (!ignore) setLoading(false)
-      }
-    }
-    load()
-    return () => { ignore = true }
-  }, [])
+  const { dashboard: data, loadingDashboard: loading, dashboardError: error, refreshDashboard, lastFetched, isStale } = useDashboard();
 
   const statusChart = useMemo(() => {
     const labels = Object.keys(data?.distributions?.status || {})
@@ -101,12 +82,20 @@ export default function Dashboard() {
 
   return (
     <div className="max-w-6xl mx-auto px-4">
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-50 mb-1">Jira Dashboard</h1>
-        <p className="text-slate-400">Overview of your Jira activity</p>
+      <header className="mb-8 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-50 mb-1">Jira Dashboard</h1>
+          <p className="text-slate-400">Overview of your Jira activity</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <button onClick={refreshDashboard} className="px-3 py-2 text-sm rounded bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50" disabled={loading}>Refresh</button>
+          {lastFetched && (
+            <span className="text-[11px] text-slate-500">Updated {new Date(lastFetched).toLocaleTimeString()} {isStale && <em className="text-amber-400">(stale)</em>}</span>
+          )}
+        </div>
       </header>
 
-      {loading && (
+      {loading && !data && (
         <div className="text-center py-12 text-slate-400">Loading dashboard…</div>
       )}
 

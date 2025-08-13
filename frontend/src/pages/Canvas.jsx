@@ -1,14 +1,24 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { marked } from 'marked';
 import { io } from 'socket.io-client';
 import { useChatContext } from '../context/ChatContext';
+import {
+  Chart as ChartJS,
+  ArcElement, BarElement, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend
+} from 'chart.js';
+import { Bar, Doughnut, Pie, Line } from 'react-chartjs-2';
+
+ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
 
 const Avatar = ({ sender }) => (
   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${sender === 'user' ? 'bg-blue-500' : 'bg-slate-600'}`}>{sender === 'user' ? 'U' : 'M'}</div>
 );
 
 export default function Canvas() {
-  const { activeChatId, setActiveChatHasMessages } = useChatContext();
+  const { activeChatId, setActiveChatHasMessages, setActiveChatId } = useChatContext();
+  const { chatId } = useParams();
+  const navigate = useNavigate();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -16,8 +26,15 @@ export default function Canvas() {
   const socketRef = useRef(null);
   const endRef = useRef(null);
 
+  // Sync route param to context
   useEffect(() => {
-    if (!activeChatId) return;
+    if (chatId && chatId !== activeChatId) {
+      setActiveChatId(chatId);
+    }
+  }, [chatId, activeChatId, setActiveChatId]);
+
+  useEffect(() => {
+    if (!activeChatId) return; // wait until context ready
     let ignore = false;
     const load = async () => {
       setLoading(true);
@@ -61,9 +78,148 @@ export default function Canvas() {
   };
 
   // Extract latest assistant message containing a markdown table (| ... |) to show on canvas; ignore pure text
-  const latestAssistant = [...messages].reverse().find(m => m.sender !== 'user' && /\|[^\n]*\|/.test(m.content || ''));
+  // Extract latest assistant message containing either a markdown table OR a chart specification fence
+  const latestAssistant = useMemo(() => {
+    return [...messages].reverse().find(m => {
+      if (m.sender === 'user') return false;
+      const content = m.content || '';
+      const hasTable = /\|[^\n]*\|/.test(content);
+      const hasChartFence = /```chart[\s\S]*?```/i.test(content);
+      return hasTable || hasChartFence;
+    });
+  }, [messages]);
 
-  const [canvasWidth, setCanvasWidth] = useState(0.65); // fraction of container
+  // Parse chart specification from assistant message (if present)
+  const chartSpec = useMemo(() => {
+    if (!latestAssistant) return null;
+    const content = latestAssistant.content || '';
+    const match = content.match(/```chart\s*\n([\s\S]*?)```/i);
+    if (!match) return null;
+    try {
+      const json = JSON.parse(match[1]);
+      return json;
+    } catch (e) { return null; }
+  }, [latestAssistant]);
+
+  // Live chart (B) + auto insight (C)
+  const [liveChart, setLiveChart] = useState(null);
+  const [autoInsight, setAutoInsight] = useState(true);
+  const fetchingRef = useRef(false);
+
+  const effectiveChartSpec = liveChart || chartSpec;
+
+  const chartComponent = useMemo(() => {
+    if (!effectiveChartSpec) return null;
+    const { type, labels = [], datasets = [] } = effectiveChartSpec;
+    const data = { labels, datasets: datasets.map(ds => ({ ...ds })) };
+    const baseOptions = { 
+      responsive: true, 
+      maintainAspectRatio: true,
+      aspectRatio: type === 'doughnut' || type === 'pie' ? 1.4 : 1.6,
+      plugins: { legend: { display: true, position: 'bottom' }, title: { display: !!effectiveChartSpec.title, text: effectiveChartSpec.title } } 
+    };
+    if (type === 'bar' || type === 'bar-vertical') {
+      return <Bar data={data} options={baseOptions} />;
+    }
+    if (type === 'bar-horizontal') {
+      const options = { ...baseOptions, indexAxis: 'y' };
+      return <Bar data={data} options={options} />;
+    }
+    if (type === 'line') return <Line data={data} options={baseOptions} />;
+    if (type === 'pie') return <Pie data={data} options={baseOptions} />;
+    if (type === 'doughnut') return <Doughnut data={data} options={baseOptions} />;
+    return null;
+  }, [effectiveChartSpec]);
+
+  // Dynamic filter scaffold (future: will re-request data with refined filters via AI)
+  const [filters, setFilters] = useState({ status: [], assignee: [], project: [] });
+  const availableFilters = useMemo(() => chartSpec?.meta?.filters || {}, [chartSpec]);
+  const updateFilter = (key, value) => {
+    setFilters(prev => ({ ...prev, [key]: prev[key].includes(value) ? prev[key].filter(v => v !== value) : [...prev[key], value] }));
+  };
+  // --- Dynamic Form State ---
+  const [form, setForm] = useState({ group_by: '', from: '', to: '' });
+  // Initialize form whenever a new chart arrives
+  useEffect(() => {
+    if (chartSpec?.meta) {
+      setForm({
+        group_by: chartSpec.meta.group_by || 'status',
+        from: chartSpec.meta.from || '',
+        to: chartSpec.meta.to || ''
+      });
+      // seed filters from meta
+      if (chartSpec.meta.filters) setFilters(chartSpec.meta.filters);
+    }
+  }, [chartSpec]);
+
+  const derivedFilterChoices = useMemo(() => {
+    // Prefer distincts if model provided (backend added 'distincts')
+    const distincts = chartSpec?.distincts || chartSpec?.meta?.distincts;
+    if (distincts) {
+      return {
+        status: distincts.status || [],
+        assignee: distincts.assignee || [],
+        project: distincts.project || []
+      };
+    }
+    const base = { status: [], assignee: [], project: [] };
+    const metaF = chartSpec?.meta?.filters || {};
+    if (chartSpec?.meta?.group_by === 'status' && (!metaF.status || !metaF.status.length)) {
+      base.status = chartSpec.labels || [];
+    } else base.status = metaF.status || [];
+    base.assignee = metaF.assignee || [];
+    base.project = metaF.project || [];
+    return base;
+  }, [chartSpec]);
+
+  const updateForm = (field, value) => {
+    setForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const buildRefinePrompt = () => {
+    const { group_by, from, to } = form;
+    const filterSegments = Object.entries(filters)
+      .filter(([, arr]) => arr.length)
+      .map(([k, arr]) => `${k}=${arr.join(',')}`);
+    return `Refine the previous chart using aggregate_issues. group_by=${group_by}. from=${from || 'unchanged'} to=${to || 'unchanged'} filters=${filterSegments.join('; ') || 'none'}. Return ONLY a chart spec code fence (chart).`;
+  };
+
+  const requestRefine = () => {
+    if (!chartSpec) return;
+    // Basic validation: if both dates provided and reversed, swap
+    if (form.from && form.to && form.from > form.to) {
+      setForm(f => ({ ...f, from: form.to, to: form.from }));
+    }
+    setInput(buildRefinePrompt());
+  };
+
+  // Direct backend aggregation call (B)
+  const callBackendAggregate = useCallback(async (reason='change') => {
+    if (fetchingRef.current) return;
+    fetchingRef.current = true;
+    try {
+      const res = await fetch('/api/chart/aggregate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ group_by: form.group_by, from: form.from || null, to: form.to || null, filters }) });
+      const data = await res.json();
+      if (data.success) {
+        setLiveChart(data.chart);
+        if (autoInsight && reason === 'change') {
+          const prompt = `Provide a concise updated insight (no greeting). Group by ${form.group_by}. Range ${form.from||'default'} to ${form.to||'default'}.`; 
+          setInput(prompt);
+        }
+      }
+    } catch(e) { /* ignore */ } finally { fetchingRef.current = false; }
+  }, [form, filters, autoInsight]);
+
+  // Auto trigger (A) debounce
+  useEffect(() => {
+    if (!form.group_by) return;
+    const t = setTimeout(() => callBackendAggregate('change'), 350);
+    return () => clearTimeout(t);
+  }, [form.group_by, form.from, form.to, filters, callBackendAggregate]);
+
+  const [canvasWidth, setCanvasWidth] = useState(0.55); // fraction of container (slightly smaller chart pane)
+  const [chartSize, setChartSize] = useState('md'); // sm | md | lg
+  const chartSizeClass = chartSize === 'sm' ? 'max-w-[380px]' : chartSize === 'lg' ? 'max-w-[860px]' : 'max-w-[560px]';
   const dragRef = useRef(null);
   const containerRef = useRef(null);
 
@@ -93,9 +249,69 @@ export default function Canvas() {
         <p className="text-slate-400 mb-6 max-w-2xl">Use the chat on the right to request charts, tables, or summaries. The AI can respond with markdown. Future enhancements will parse structured JSON blocks for dynamic charts.</p>
         <div className="space-y-6">
           {latestAssistant ? (
-            <div className="bg-[#0f0f23]/70 border border-blue-500/10 rounded-lg p-4">
-              <h2 className="text-slate-200 font-semibold mb-2">Latest Output</h2>
-              <div className="prose prose-invert max-w-none [&_table]:w-full [&_table]:text-xs [&_table]:border [&_table]:border-slate-600/50 [&_th]:font-semibold [&_th]:text-slate-300 [&_th]:border [&_th]:border-slate-700/50 [&_td]:border [&_td]:border-slate-700/50 [&_td]:align-top [&_tbody_tr:nth-child(even)]:bg-slate-800/30" dangerouslySetInnerHTML={{ __html: marked.parse(latestAssistant.content || '') }} />
+            <div className="bg-[#0f0f23]/70 border border-blue-500/10 rounded-lg p-4 space-y-4">
+              <h2 className="text-slate-200 font-semibold">Latest Output</h2>
+              {chartComponent && (
+                <div className="space-y-4">
+                  <div className={`w-full mx-auto ${chartSizeClass} transition-all duration-300 bg-slate-900/40 rounded-lg p-4 shadow-inner flex items-center justify-center`}>
+                    <div className="w-full">
+                      {chartComponent}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 text-[11px] text-slate-500">
+                    <label className="flex items-center gap-1 cursor-pointer select-none">
+                      <input type="checkbox" className="accent-blue-600" checked={autoInsight} onChange={e => setAutoInsight(e.target.checked)} />
+                      Auto insight
+                    </label>
+                    {liveChart && !chartSpec && <span className="text-amber-400">Live preview (no AI summary yet)</span>}
+                  </div>
+                  <div className="flex gap-2 text-xs">
+                    <span className="text-slate-500">Size:</span>
+                    {['sm','md','lg'].map(s => (
+                      <button key={s} type="button" onClick={() => setChartSize(s)} className={`px-2 py-1 rounded border text-[11px] ${chartSize===s ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-800/60 border-slate-600 hover:border-slate-500'}`}>{s}</button>
+                    ))}
+                  </div>
+                  {effectiveChartSpec?.meta && (
+                    <div className="text-xs text-slate-300 space-y-3">
+                      <div className="flex flex-wrap gap-4">
+                        <div className="space-y-1">
+                          <label className="block text-[10px] uppercase tracking-wide text-slate-500">Group By</label>
+                          <select value={form.group_by} onChange={e => updateForm('group_by', e.target.value)} className="bg-slate-800/70 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none focus:border-blue-500">
+                            {['status','priority','assignee','type','created_date'].map(g => <option key={g} value={g}>{g}</option>)}
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="block text-[10px] uppercase tracking-wide text-slate-500">From</label>
+                          <input type="date" value={form.from} onChange={e => updateForm('from', e.target.value)} className="bg-slate-800/70 border border-slate-600 rounded px-2 py-1 text-xs" />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="block text-[10px] uppercase tracking-wide text-slate-500">To</label>
+                          <input type="date" value={form.to} onChange={e => updateForm('to', e.target.value)} className="bg-slate-800/70 border border-slate-600 rounded px-2 py-1 text-xs" />
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-4">
+                        {Object.entries(derivedFilterChoices).map(([k, arr]) => (
+                          <div key={k} className="bg-slate-800/40 p-2 rounded min-w-[140px]">
+                            <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1">{k}</div>
+                            <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto pr-1">
+                              {arr.slice(0,50).map(val => (
+                                <button type="button" key={val} onClick={() => updateFilter(k, val)} className={`px-2 py-0.5 rounded text-[10px] border ${filters[k]?.includes(val) ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-700/60 border-slate-600 hover:border-slate-500'}`}>{val}</button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        <button type="button" onClick={requestRefine} className="px-3 py-1.5 rounded bg-gradient-to-r from-blue-500 to-blue-700 text-white text-xs hover:from-blue-400 hover:to-blue-600">AI Refine (Prompt)</button>
+                        <button type="button" onClick={() => callBackendAggregate('manual')} className="px-3 py-1.5 rounded bg-slate-700 text-slate-200 text-xs hover:bg-slate-600">Refresh Data</button>
+                        <button type="button" onClick={() => { setFilters({ status: [], assignee: [], project: [] }); setForm(f => ({ ...f, group_by: chartSpec.meta.group_by, from: chartSpec.meta.from, to: chartSpec.meta.to })); }} className="px-3 py-1.5 rounded bg-slate-700 text-slate-200 text-xs hover:bg-slate-600">Reset</button>
+                      </div>
+                      <div className="text-[11px] text-slate-500">Prompt will be prepared in the input; you can adjust before sending.</div>
+                    </div>
+                  )}
+                </div>
+              )}
+              <div className="prose prose-invert max-w-none [&_table]:w-full [&_table]:text-xs [&_table]:border [&_table]:border-slate-600/50 [&_th]:font-semibold [&_th]:text-slate-300 [&_th]:border [&_th]:border-slate-700/50 [&_td]:border [&_td]:border-slate-700/50 [&_td]:align-top [&_tbody_tr:nth-child(even)]:bg-slate-800/30" dangerouslySetInnerHTML={{ __html: marked.parse((latestAssistant.content || '').replace(/```chart[\s\S]*?```/gi, '') ) }} />
             </div>
           ) : (
             <div className="text-slate-500 italic">No AI output yet. Ask something like: "Show a bar chart of tickets by status".</div>
@@ -103,8 +319,8 @@ export default function Canvas() {
         </div>
       </div>
       <div ref={dragRef} onMouseDown={startDrag} className="w-1 bg-blue-500/30 cursor-col-resize hover:bg-blue-400/60 transition" />
-      <div className="flex flex-col bg-slate-900/70" style={{ width: `${(1-canvasWidth)*100}%` }}>
-        <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex flex-col bg-slate-900/70 min-w-[300px]" style={{ width: `${(1-canvasWidth)*100}%` }}>
+        <div className="flex-1 overflow-y-auto p-4 min-h-0">
           {messages.map((m, i) => {
             const isTable = /\|[^\n]*\|/.test(m.content || '');
             // Skip assistant table messages (they go to canvas) but always show user + non-table assistant text
@@ -112,7 +328,7 @@ export default function Canvas() {
             return (
               <div key={i} className={`flex gap-3 my-4 ${m.sender === 'user' ? 'flex-row-reverse text-right' : ''}`}> 
                 <Avatar sender={m.sender} />
-                <div className={`max-w-xs md:max-w-sm p-3 rounded-lg prose prose-invert prose-sm ${m.sender === 'user' ? 'bg-blue-600' : 'bg-slate-700'}`} dangerouslySetInnerHTML={{ __html: marked.parse(m.content || '') }} />
+                <div className={`max-w-full md:max-w-md lg:max-w-lg xl:max-w-xl p-3 rounded-lg prose prose-invert prose-sm break-words ${m.sender === 'user' ? 'bg-blue-600' : 'bg-slate-700'} [&_pre]:whitespace-pre-wrap [&_pre]:max-h-60 [&_pre]:overflow-y-auto [&_code]:break-words`} dangerouslySetInnerHTML={{ __html: marked.parse(m.content || '') }} />
               </div>
             );
           })}
