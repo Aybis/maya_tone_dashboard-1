@@ -4,16 +4,16 @@ Modern Jira dashboard with AI-powered conversational search + direct aggregation
 
 ## High-Level Architecture
 
-| Layer | Description |
-|-------|-------------|
-| frontend/ | React (Vite + Tailwind) SPA (Dashboard, Canvas Chat, AI Search) |
-| backend/ | Flask app (app factory + blueprints + SocketIO) |
-| backend/api/chat.py | Conversational AI (OpenAI function calling + Jira tool dispatcher) |
-| backend/api/chart.py | Direct non-LLM aggregation -> chart spec JSON |
-| backend/api/dashboard.py | Summary metrics & distributions for main dashboard |
-| backend/services/ | Jira CRUD, OpenAI helpers, tool dispatcher abstractions |
-| backend/jira_utils.py | JiraManager + aggregation logic (counts, distributions) |
-| backend/db.py | SQLite helpers (chat messages & sessions) |
+| Layer                    | Description                                                        |
+| ------------------------ | ------------------------------------------------------------------ |
+| frontend/                | React (Vite + Tailwind) SPA (Dashboard, Canvas Chat, AI Search)    |
+| backend/                 | Flask app (app factory + blueprints + SocketIO)                    |
+| backend/api/chat.py      | Conversational AI (OpenAI function calling + Jira tool dispatcher) |
+| backend/api/chart.py     | Direct non-LLM aggregation -> chart spec JSON                      |
+| backend/api/dashboard.py | Summary metrics & distributions for main dashboard                 |
+| backend/services/        | Jira CRUD, OpenAI helpers, tool dispatcher abstractions            |
+| backend/jira_utils.py    | JiraManager + aggregation logic (counts, distributions)            |
+| backend/db.py            | SQLite helpers (chat messages & sessions)                          |
 
 Key design choices:
 - Separation of concerns: Chat logic isolated from raw Jira operations.
@@ -34,14 +34,18 @@ Direct dashboard/aggregation bypasses LLM entirely for speed.
 
 ## Environment Setup
 
-Create `backend/.env`:
+Create `.env` in project root:
 ```
 JIRA_BASE_URL=https://your-domain.atlassian.net
-JIRA_USERNAME=your.jira.username
-JIRA_PASSWORD=your.jira.api.token
 OPENAI_API_KEY=sk-...
-SECRET_KEY=dev-secret
+SECRET_KEY=your-secret-key
+
+# Legacy credentials (no longer used - now using session-based authentication)
+# JIRA_USERNAME=your.jira.username
+# JIRA_PASSWORD=your.jira.api.token
 ```
+
+**Note**: The application now uses session-based authentication. Users log in through the web interface with their Jira credentials, which are validated against the Jira API and stored securely in the session.
 
 Install backend deps:
 ```bash
@@ -69,16 +73,23 @@ Open http://localhost:5173
 
 ## Core Endpoints
 
-Health: GET /api/health
-Dashboard Stats: GET /api/dashboard-stats
-Aggregate (direct chart): POST /api/chart/aggregate
-Chat lifecycle:
+**Authentication:**
+- POST /api/login - Authenticate with Jira credentials
+- POST /api/logout - Clear session
+- GET /api/check-auth - Check authentication status
+
+**Core Features:**
+- Health: GET /api/health
+- Dashboard Stats: GET /api/dashboard-stats
+- Aggregate (direct chart): POST /api/chart/aggregate
+
+**Chat lifecycle:**
 - POST /api/chat/new
 - GET  /api/chat/history
 - GET  /api/chat/<chat_id>
 - PUT  /api/chat/<chat_id>/title
 - DELETE /api/chat/<chat_id>/delete
-Ask AI: POST /api/chat/<chat_id>/ask  { "message": "..." }
+- Ask AI: POST /api/chat/<chat_id>/ask  { "message": "..." }
 
 ### Aggregate Request Example
 ```bash
@@ -106,14 +117,28 @@ The frontend can parse these blocks to render charts directly.
 
 ## Frontend Notes
 
-Key providers:
+**Authentication Flow:**
+- Modern login interface with enhanced UI/UX
+- Real-time credential validation against Jira API
+- Password visibility toggle for better user experience
+- Session-based authentication with automatic redirects
+
+**Key providers:**
 - ChatProvider: manages chat sessions & message history.
 - DashboardProvider: caches dashboard stats (stale-while-revalidate pattern).
 
-Pages:
+**Pages:**
+- Login: Enhanced authentication interface with gradient design and visual feedback
 - Dashboard: visual summaries, uses cached stats.
 - Canvas / Chat routes: conversational interface (LLM + charts in messages).
 - AI Search: targeted exploration (future expansion).
+
+**UI/UX Features:**
+- Modern gradient backgrounds with subtle animations
+- Enhanced form inputs with icons and focus states
+- Smooth transitions and hover effects
+- Responsive design with improved visual hierarchy
+- Loading states with animated spinners
 
 Styling via Tailwind (see `tailwind.config.js`). Charts via Chart.js wrapper components.
 
@@ -136,23 +161,52 @@ Add socket events:
 - Integration: chat ask flow with mocked OpenAI.
 
 ## Troubleshooting
-OpenAI errors: validate key, model availability.
-Jira auth failures: confirm API token & email/username pairing.
-SQLite locked: ensure single writer or switch to a server DB (Postgres) for concurrency.
+
+**Authentication Issues:**
+- **Invalid credentials**: The app now validates credentials against Jira in real-time. Ensure your Jira username and password/API token are correct
+- **Connection errors**: Check JIRA_BASE_URL in .env file and network connectivity
+- **Timeout errors**: Jira server may be slow or unreachable - try again later
+
+**General Issues:**
+- OpenAI errors: validate key, model availability
+- SQLite locked: ensure single writer or switch to a server DB (Postgres) for concurrency
+- Session issues: Clear browser cookies/localStorage if experiencing login problems
 
 ## Repository Scripts
 `Makefile` contains dev helpers (e.g., `make dev`). Adjust ports via env vars if needed.
 
 ## Security Considerations
-- Move plaintext Jira credentials to a secrets manager in production.
-- Rate-limit chat endpoint if exposed publicly.
-- Sanitize tool outputs before echoing in AI responses (currently raw JSON).
+- **Enhanced Authentication**: Credentials are now validated against Jira API before session creation
+- **Session Security**: User credentials are stored securely in Flask sessions with configurable secret key
+- **API Validation**: All Jira API calls validate credentials in real-time using `/rest/api/2/myself` endpoint
+- **Error Handling**: Proper error messages for invalid credentials, network issues, and timeouts
+- Rate-limit chat endpoint if exposed publicly
+- Sanitize tool outputs before echoing in AI responses (currently raw JSON)
+- Consider implementing session timeout and refresh mechanisms for production use
+
+## Recent Updates
+
+**Authentication & Security (Latest):**
+- ✅ Real-time Jira credential validation using `/rest/api/2/myself` endpoint
+- ✅ Enhanced login UI with modern gradient design and animations
+- ✅ Password visibility toggle for better UX
+- ✅ Proper error handling for invalid credentials and network issues
+- ✅ Session-based authentication replacing static credentials
+
+**UI/UX Improvements:**
+- ✅ Modern login interface with gradient backgrounds and blur effects
+- ✅ Enhanced form inputs with icons and improved focus states
+- ✅ Smooth animations and transitions throughout the interface
+- ✅ Better loading states with animated spinners
+- ✅ Improved visual hierarchy and spacing
 
 ## Roadmap Ideas
-- Real-time push for new dashboard stats via SocketIO.
-- React suspense/data fetching library (React Query) instead of hand-rolled context caches.
-- Persistent chart templates & user-defined saved filters.
-- Role-based auth & multi-user separation.
+- Real-time push for new dashboard stats via SocketIO
+- React suspense/data fetching library (React Query) instead of hand-rolled context caches
+- Persistent chart templates & user-defined saved filters
+- Role-based auth & multi-user separation
+- Session timeout and refresh mechanisms
+- Remember me functionality with secure token storage
 
 ---
 Maintainer Handoff: See inline docstrings across backend/ for detailed flow explanations. Start at `backend/__init__.py` → blueprint modules → services.
