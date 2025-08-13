@@ -13,7 +13,8 @@ def init_db():
     c.execute('''
         CREATE TABLE IF NOT EXISTS chats (
             id TEXT PRIMARY KEY, title TEXT, created_at TIMESTAMP,
-            updated_at TIMESTAMP, user_id TEXT, pending_action TEXT
+            updated_at TIMESTAMP, user_id TEXT, pending_action TEXT,
+            provider TEXT
         )''')
     c.execute('''
         CREATE TABLE IF NOT EXISTS messages (
@@ -22,6 +23,22 @@ def init_db():
         )''')
     conn.commit()
     conn.close()
+    migrate_add_provider_column()
+
+
+def migrate_add_provider_column():
+    """Idempotent migration ensuring 'provider' column exists (older DBs)."""
+    conn = get_conn(); c = conn.cursor()
+    try:
+        c.execute("PRAGMA table_info(chats)")
+        cols = [row[1] for row in c.fetchall()]
+        if 'provider' not in cols:
+            c.execute("ALTER TABLE chats ADD COLUMN provider TEXT")
+            conn.commit()
+    except Exception:
+        pass
+    finally:
+        conn.close()
 
 
 def insert_message(chat_id, content, sender):
@@ -64,4 +81,17 @@ def clear_pending_action(chat_id):
 def touch_chat(chat_id):
     conn = get_conn(); c = conn.cursor()
     c.execute('UPDATE chats SET updated_at = ? WHERE id = ?', (datetime.now(), chat_id))
+    conn.commit(); conn.close()
+
+
+def get_chat_provider(chat_id):
+    conn = get_conn(); c = conn.cursor()
+    c.execute('SELECT provider FROM chats WHERE id = ?', (chat_id,))
+    row = c.fetchone(); conn.close()
+    return row[0] if row and row[0] else None
+
+
+def set_chat_provider(chat_id, provider):
+    conn = get_conn(); c = conn.cursor()
+    c.execute('UPDATE chats SET provider = ? WHERE id = ?', (provider, chat_id))
     conn.commit(); conn.close()

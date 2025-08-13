@@ -8,19 +8,17 @@ export function ChatProvider({ children }) {
   const [loadingChats, setLoadingChats] = useState(false);
   const [error, setError] = useState('');
   const [activeChatHasMessages, setActiveChatHasMessages] = useState(false);
+  const [providers, setProviders] = useState([]);
+  const [activeProvider, setActiveProvider] = useState('gemini');
 
-  const createNewChat = useCallback(async () => {
-    // Explicit manual creation (still available if needed elsewhere)
-    try {
-      const res = await fetch('/api/chat/new', { method: 'POST' });
-      const data = await res.json();
-      const title = data.title || `Chat ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-      setChats(prev => [{ id: data.chat_id, title }, ...prev]);
-      setActiveChatId(data.chat_id);
-      return data.chat_id;
-    } catch (e) {
-      setError('Failed to create chat');
-    }
+  // Lazy chat creation: produce a temporary client id until first message sent.
+  const createNewChat = useCallback(() => {
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+    const title = `New Chat ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    setChats(prev => [{ id: tempId, title, _temp: true }, ...prev]);
+    setActiveChatId(tempId);
+    setActiveChatHasMessages(false);
+    return tempId;
   }, []);
 
   const fetchHistory = useCallback(async () => {
@@ -40,6 +38,65 @@ export function ChatProvider({ children }) {
   }, [activeChatId, createNewChat]);
 
   useEffect(() => { fetchHistory(); }, [fetchHistory]);
+
+  // Load providers list once
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/llm/providers');
+        const data = await res.json();
+        setProviders(data);
+      } catch {}
+    })();
+  }, []);
+
+  // Fetch provider for active chat
+  useEffect(() => {
+    if (!activeChatId) return;
+    (async () => {
+      try {
+        const res = await fetch(`/api/chat/${activeChatId}/provider`);
+        const data = await res.json();
+        if (data.provider) setActiveProvider(data.provider);
+      } catch {}
+    })();
+  }, [activeChatId]);
+
+  const finalizeTempChat = useCallback(async (tempId, provider) => {
+    try {
+      const res = await fetch('/api/chat/new', { method: 'POST' });
+      const data = await res.json();
+      setChats(prev => prev.map(c => c.id === tempId ? { id: data.chat_id, title: data.title || c.title } : c));
+      setActiveChatId(data.chat_id);
+      if (provider && provider !== data.provider) {
+        // switch provider immediately if mismatch
+        await fetch(`/api/chat/${data.chat_id}/provider`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider, create_new: false }) });
+        setActiveProvider(provider);
+      } else if (data.provider) {
+        setActiveProvider(data.provider);
+      }
+      return data.chat_id;
+    } catch (e) {
+      setError('Failed to create chat');
+      return tempId;
+    }
+  }, []);
+
+  const switchProvider = useCallback(async (newProvider) => {
+    if (!activeChatId) return;
+    // If current chat is temp just change activeProvider state
+    const current = chats.find(c => c.id === activeChatId);
+    if (current && current._temp) { setActiveProvider(newProvider); return; }
+    try {
+      const res = await fetch(`/api/chat/${activeChatId}/provider`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider: newProvider, create_new: true }) });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Failed to switch');
+      setChats(prev => [{ id: data.chat_id, title: (prev.find(c => c.id === activeChatId)?.title || 'Chat') + ' (switched)' }, ...prev]);
+      setActiveChatId(data.chat_id);
+      setActiveProvider(data.provider);
+      setActiveChatHasMessages(false);
+    } catch (e) { setError('Failed to switch provider'); }
+  }, [activeChatId, chats]);
 
   // Delete a chat from DB and state
   const deleteChat = useCallback(async (chatId) => {
@@ -75,7 +132,7 @@ export function ChatProvider({ children }) {
     }
   }, []);
 
-  const value = { chats, activeChatId, setActiveChatId, createNewChat, deleteChat, renameChat, refreshChats: fetchHistory, loadingChats, error, activeChatHasMessages, setActiveChatHasMessages };
+  const value = { chats, activeChatId, setActiveChatId, createNewChat, finalizeTempChat, deleteChat, renameChat, refreshChats: fetchHistory, loadingChats, error, activeChatHasMessages, setActiveChatHasMessages, providers, activeProvider, switchProvider };
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 }
 

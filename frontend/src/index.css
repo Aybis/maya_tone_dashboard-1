@@ -3,11 +3,28 @@
 @tailwind utilities;
 
 html, body, #root { height: 100%; }
-body { @apply font-sans bg-gradient-to-b from-[#1a1a2e] via-[#16213e] to-[#0f0f23] text-slate-200; }
+body { @apply font-sans bg-white text-slate-800 transition-colors; }
+html.dark body { @apply bg-gradient-to-b from-[#1a1a2e] via-[#16213e] to-[#0f0f23] text-slate-200; }
+
+/* Subtle themed scrollbars */
+* {
+	scrollbar-width: thin;
+	scrollbar-color: rgba(100,116,139,0.4) transparent; /* slate-500 */
+}
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: rgba(100,116,139,0.35); border-radius: 8px; }
+*::-webkit-scrollbar-thumb:hover { background: rgba(100,116,139,0.55); }
+html.dark *::-webkit-scrollbar-thumb { background: rgba(71,85,105,0.45); }
+html.dark *::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,0.5); }
+
+/* Smooth theme transition */
+.theme-fade { @apply transition-colors duration-300; }
+.theme-fade-all { transition: background-color .4s ease, color .4s ease, border-color .4s ease, box-shadow .4s ease, fill .4s ease, stroke .4s ease; }
 
 /* Markdown table styling */
-.prose table { @apply border border-slate-600/50 rounded-md overflow-hidden w-full text-xs; }
-.prose thead { @apply bg-slate-800/60; }
-.prose th, .prose td { @apply border border-slate-700/50 px-3 py-2 align-top; }
-.prose tbody tr:nth-child(even) { @apply bg-slate-800/30; }
-.prose tbody tr:hover { @apply bg-slate-700/30; }
+.prose table { @apply border border-slate-300 dark:border-slate-600/50 rounded-md overflow-hidden w-full text-xs; }
+.prose thead { @apply bg-slate-200 dark:bg-slate-800/60; }
+.prose th, .prose td { @apply border border-slate-300 dark:border-slate-700/50 px-3 py-2 align-top; }
+.prose tbody tr:nth-child(even) { @apply bg-slate-100 dark:bg-slate-800/30; }
+.prose tbody tr:hover { @apply bg-slate-200 dark:bg-slate-700/30; }

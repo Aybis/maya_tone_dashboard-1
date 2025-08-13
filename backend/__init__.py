@@ -11,7 +11,8 @@ from flask import Flask, jsonify
 from .config import SECRET_KEY
 from .extensions import init_extensions, socketio
 from .db import init_db
-from .api.chat import chat_bp
+from .api.chat_sync import chat_sync_bp
+from .api.chat_stream import chat_stream_bp
 from .api.dashboard import dashboard_bp
 from .api.chart import chart_bp
 
@@ -30,8 +31,31 @@ def create_app():
     app = Flask(__name__)
     app.secret_key = SECRET_KEY
     init_extensions(app)
+
+    # Structured JSON request logging middleware (lightweight)
+    import time, json as _json, logging
+    @app.before_request
+    def _req_start():
+        from flask import g, request as _r
+        g._t0 = time.time()
+        g._req_id = getattr(_r, 'headers', {}).get('X-Request-ID') or str(time.time_ns())
+
+    @app.after_request
+    def _req_log(resp):
+        from flask import g, request as _r
+        try:
+            dt = (time.time()-getattr(g,'_t0', time.time()))*1000
+            rec = {
+                'type':'http','rid': getattr(g,'_req_id', None),'method': _r.method,'path': _r.path,
+                'status': resp.status_code,'ms': round(dt,1)
+            }
+            logging.info(_json.dumps(rec, ensure_ascii=False))
+        except Exception:
+            pass
+        return resp
     init_db()
-    app.register_blueprint(chat_bp)
+    app.register_blueprint(chat_sync_bp)
+    app.register_blueprint(chat_stream_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(chart_bp)
 

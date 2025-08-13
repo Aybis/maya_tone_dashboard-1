@@ -15,7 +15,7 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Le
 
 function SummaryCard({ title, value }) {
   return (
-    <div className="bg-[#0f0f23]/80 border border-blue-500/10 rounded-lg p-5 shadow">
+  <div className="bg-white dark:bg-[#0f0f23]/80 border border-slate-200 dark:border-blue-500/10 rounded-lg p-5 shadow">
       <div className="text-slate-400 text-sm">{title}</div>
       <div className="text-2xl font-bold text-slate-50 mt-1">{value}</div>
     </div>
@@ -117,7 +117,7 @@ export default function Dashboard() {
           </section>
 
           <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-[#0f0f23]/80 border border-blue-500/10 rounded-lg p-4">
+            <div className="bg-white dark:bg-[#0f0f23]/80 border border-slate-200 dark:border-blue-500/10 rounded-lg p-4">
               <h3 className="text-slate-200 font-semibold mb-3">Status Distribution</h3>
               <div className="h-56 md:h-64">
                 <Bar
@@ -134,7 +134,7 @@ export default function Dashboard() {
                 />
               </div>
             </div>
-            <div className="bg-[#0f0f23]/80 border border-blue-500/10 rounded-lg p-4">
+            <div className="bg-white dark:bg-[#0f0f23]/80 border border-slate-200 dark:border-blue-500/10 rounded-lg p-4">
               <h3 className="text-slate-200 font-semibold mb-3">Priority</h3>
               <div className="h-56 md:h-64">
                 <Doughnut
@@ -148,7 +148,7 @@ export default function Dashboard() {
                 />
               </div>
             </div>
-            <div className="bg-[#0f0f23]/80 border border-blue-500/10 rounded-lg p-4">
+            <div className="bg-white dark:bg-[#0f0f23]/80 border border-slate-200 dark:border-blue-500/10 rounded-lg p-4">
               <h3 className="text-slate-200 font-semibold mb-3">Top Assignees</h3>
               <div className="h-56 md:h-64">
                 <Bar
@@ -166,7 +166,7 @@ export default function Dashboard() {
                 />
               </div>
             </div>
-            <div className="bg-[#0f0f23]/80 border border-blue-500/10 rounded-lg p-4">
+            <div className="bg-white dark:bg-[#0f0f23]/80 border border-slate-200 dark:border-blue-500/10 rounded-lg p-4">
               <h3 className="text-slate-200 font-semibold mb-3">Issue Types</h3>
               <div className="h-56 md:h-64">
                 <Pie
@@ -181,12 +181,12 @@ export default function Dashboard() {
             </div>
           </section>
 
-          <section className="bg-[#0f0f23]/80 border border-blue-500/10 rounded-lg p-4">
+          <section className="bg-white dark:bg-[#0f0f23]/80 border border-slate-200 dark:border-blue-500/10 rounded-lg p-4">
             <h3 className="text-slate-200 font-semibold mb-3">Recent Tickets</h3>
             {data.recent_tickets?.length ? (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {data.recent_tickets.map((t) => (
-                  <div key={t.key} className="bg-[#0f0f23]/80 border border-blue-500/10 rounded-lg p-4">
+                  <div key={t.key} className="bg-white dark:bg-[#0f0f23]/80 border border-slate-200 dark:border-blue-500/10 rounded-lg p-4">
                     <div className="flex justify-between items-start mb-2">
                       <a href={t.url} target="_blank" rel="noreferrer" className="text-blue-400 font-semibold">{t.key}</a>
                       <span className="text-xs px-2 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-300">{t.status}</span>

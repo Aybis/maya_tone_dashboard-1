@@ -1,0 +1,17 @@
+"""Tool schema builders for LLM function calling.
+Add new logical tool groups here and keep API layer slim.
+"""
+from typing import List, Dict
+
+def build_jira_tools(current_date: str, month_start: str) -> List[Dict]:
+    return [
+        {"type":"function","function":{"name":"aggregate_issues","description":"Agregasi issue untuk chart (kembalikan distribusi counts).","parameters":{"type":"object","properties":{"group_by":{"type":"string","enum":["status","priority","assignee","type","created_date"]},"from_date":{"type":"string","description":"YYYY-MM-DD mulai (opsional)"},"to_date":{"type":"string","description":"YYYY-MM-DD akhir (opsional)"},"jql_extra":{"type":"string","description":"Tambahan filter JQL"}},"required":["group_by"]}}},
+        {"type":"function","function":{"name":"get_issues","description":f"Cari issue via JQL gunakan tanggal real-time: today={current_date} month_start={month_start}","parameters":{"type":"object","properties":{"jql_query":{"type":"string","description":"Kueri JQL lengkap"},"max_results":{"type":"integer","description":"Batas hasil (default 50)"}},"required":["jql_query"]}}},
+        {"type":"function","function":{"name":"get_projects","description":"Daftar semua project Jira (key + name).","parameters":{"type":"object","properties":{}}}},
+        {"type":"function","function":{"name":"get_issue_types","description":"Daftar issue types; jika project_key diberikan hanya dari project tsb.","parameters":{"type":"object","properties":{"project_key":{"type":"string"}}}}},
+        {"type":"function","function":{"name":"get_worklogs","description":"Ambil worklog user saat ini dalam rentang tanggal (inklusi).","parameters":{"type":"object","properties":{"from_date":{"type":"string","description":"YYYY-MM-DD"},"to_date":{"type":"string","description":"YYYY-MM-DD"}},"required":["from_date","to_date"]}}},
+        {"type":"function","function":{"name":"create_worklog","description":"Buat worklog pada issue tertentu.","parameters":{"type":"object","properties":{"issue_key":{"type":"string"},"time_spent_hours":{"type":"number"},"description":{"type":"string"}},"required":["issue_key","time_spent_hours"]}}},
+        {"type":"function","function":{"name":"update_worklog","description":"Update worklog (waktu atau deskripsi).","parameters":{"type":"object","properties":{"issue_key":{"type":"string"},"worklog_id":{"type":"string"},"time_spent_hours":{"type":"number"},"description":{"type":"string"}},"required":["issue_key","worklog_id"]}}},
+        {"type":"function","function":{"name":"delete_worklog","description":"Hapus worklog tertentu.","parameters":{"type":"object","properties":{"issue_key":{"type":"string"},"worklog_id":{"type":"string"}},"required":["issue_key","worklog_id"]}}},
+        {"type":"function","function":{"name":"manage_issue","description":"Create / update / delete issue. Gunakan action=create|update|delete. Untuk create/update sertakan fields di details.","parameters":{"type":"object","properties":{"action":{"type":"string","enum":["create","update","delete"]},"details":{"type":"object","description":"Field issue. For update/delete sertakan issue_key.","properties":{"issue_key":{"type":"string"},"project_key":{"type":"string"},"summary":{"type":"string"},"description":{"type":"string"},"acceptance_criteria":{"type":"string"},"priority_name":{"type":"string"},"assignee_name":{"type":"string"},"duedate":{"type":"string"},"issuetype_name":{"type":"string"}}}},"required":["action"]}}},
+    ]

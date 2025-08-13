@@ -1,19 +1,23 @@
-import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { marked } from 'marked';
-import { io } from 'socket.io-client';
-import { useChatContext } from '../context/ChatContext';
 import {
+  ArcElement, BarElement, CategoryScale,
   Chart as ChartJS,
-  ArcElement, BarElement, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend
+  Legend,
+  LinearScale,
+  LineElement,
+  PointElement,
+  Tooltip
 } from 'chart.js';
-import { Bar, Doughnut, Pie, Line } from 'react-chartjs-2';
+import { marked } from 'marked';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Bar, Doughnut, Line, Pie } from 'react-chartjs-2';
+import { useNavigate, useParams } from 'react-router-dom';
+import { io } from 'socket.io-client';
+import Avatar from '../components/ui/Avatar';
+import { useChatContext } from '../context/ChatContext';
 
 ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
 
-const Avatar = ({ sender }) => (
-  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${sender === 'user' ? 'bg-blue-500' : 'bg-slate-600'}`}>{sender === 'user' ? 'U' : 'M'}</div>
-);
+
 
 export default function Canvas() {
   const { activeChatId, setActiveChatHasMessages, setActiveChatId, refreshChats } = useChatContext();
@@ -277,19 +281,19 @@ export default function Canvas() {
 
   return (
     <div className="flex h-[calc(100vh-0px)]" ref={containerRef}>
-      <div className="overflow-y-auto p-6 bg-[#0f0f23]/40 border-r border-blue-500/10" style={{ width: `${canvasWidth*100}%` }}>
-        <h1 className="text-2xl font-bold mb-4 text-slate-50">Canvas</h1>
-        <p className="text-slate-400 mb-6 max-w-2xl">Use the chat on the right to request charts, tables, or summaries. The AI can respond with markdown. Future enhancements will parse structured JSON blocks for dynamic charts.</p>
+  <div className="overflow-y-auto p-6 bg-zinc-50 dark:bg-[#0f0f23]/40 border-r border-slate-200 dark:border-blue-500/10" style={{ width: `${canvasWidth*100}%` }}>
+        <h1 className="text-2xl font-bold mb-4 text-slate-900 dark:text-slate-50">Canvas</h1>
+        <p className="text-slate-600 dark:text-slate-400 mb-6 max-w-2xl">Use the chat on the right to request charts, tables, or summaries. The AI can respond with markdown. Future enhancements will parse structured JSON blocks for dynamic charts.</p>
         <div className="space-y-6">
           {latestAssistant ? (
-            <div className="bg-[#0f0f23]/70 border border-blue-500/10 rounded-lg p-4 space-y-4">
-              <h2 className="text-slate-200 font-semibold">Latest Output</h2>
+            <div className="bg-white/90 dark:bg-[#0f0f23]/70 backdrop-blur border border-slate-200 dark:border-blue-500/10 rounded-lg p-4 space-y-4 shadow-sm dark:shadow-none">
+              <h2 className="text-slate-700 dark:text-slate-200 font-semibold">Latest Output</h2>
               {loading && !chartComponent && (
                 <div className="text-[13px] text-slate-500 italic animate-pulse">Thinking…</div>
               )}
               {chartComponent && (
                 <div className="space-y-4">
-                  <div className={`w-full mx-auto ${chartSizeClass} transition-all duration-300 bg-slate-900/40 rounded-lg p-4 shadow-inner flex items-center justify-center`}>
+                  <div className={`w-full mx-auto ${chartSizeClass} transition-all duration-300 bg-zinc-100 dark:bg-slate-900/40 rounded-lg p-4 shadow-inner flex items-center justify-center`}> 
                     <div className="w-full">
                       {chartComponent}
                     </div>
@@ -304,7 +308,7 @@ export default function Canvas() {
                   <div className="flex gap-2 text-xs">
                     <span className="text-slate-500">Size:</span>
                     {['sm','md','lg'].map(s => (
-                      <button key={s} type="button" onClick={() => setChartSize(s)} className={`px-2 py-1 rounded border text-[11px] ${chartSize===s ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-800/60 border-slate-600 hover:border-slate-500'}`}>{s}</button>
+                      <button key={s} type="button" onClick={() => setChartSize(s)} className={`px-2 py-1 rounded border text-[11px] transition ${chartSize===s ? 'bg-blue-600 border-blue-500 text-white shadow-sm' : 'bg-white dark:bg-slate-800/60 border-slate-300 dark:border-slate-600 hover:border-blue-400 dark:hover:border-slate-500'}`}>{s}</button>
                     ))}
                   </div>
                   {effectiveChartSpec?.meta && (
@@ -312,35 +316,35 @@ export default function Canvas() {
                       <div className="flex flex-wrap gap-4">
                         <div className="space-y-1">
                           <label className="block text-[10px] uppercase tracking-wide text-slate-500">Group By</label>
-                          <select value={form.group_by} onChange={e => updateForm('group_by', e.target.value)} className="bg-slate-800/70 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none focus:border-blue-500">
+                          <select value={form.group_by} onChange={e => updateForm('group_by', e.target.value)} className="bg-white dark:bg-slate-800/70 border border-slate-300 dark:border-slate-600 rounded px-2 py-1 text-xs focus:outline-none focus:border-blue-500">
                             {['status','priority','assignee','type','created_date'].map(g => <option key={g} value={g}>{g}</option>)}
                           </select>
                         </div>
                         <div className="space-y-1">
                           <label className="block text-[10px] uppercase tracking-wide text-slate-500">From</label>
-                          <input type="date" value={form.from} onChange={e => updateForm('from', e.target.value)} className="bg-slate-800/70 border border-slate-600 rounded px-2 py-1 text-xs" />
+                          <input type="date" value={form.from} onChange={e => updateForm('from', e.target.value)} className="bg-white dark:bg-slate-800/70 border border-slate-300 dark:border-slate-600 rounded px-2 py-1 text-xs" />
                         </div>
                         <div className="space-y-1">
                           <label className="block text-[10px] uppercase tracking-wide text-slate-500">To</label>
-                          <input type="date" value={form.to} onChange={e => updateForm('to', e.target.value)} className="bg-slate-800/70 border border-slate-600 rounded px-2 py-1 text-xs" />
+                          <input type="date" value={form.to} onChange={e => updateForm('to', e.target.value)} className="bg-white dark:bg-slate-800/70 border border-slate-300 dark:border-slate-600 rounded px-2 py-1 text-xs" />
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-4">
                         {Object.entries(derivedFilterChoices).map(([k, arr]) => (
-                          <div key={k} className="bg-slate-800/40 p-2 rounded min-w-[140px]">
+                          <div key={k} className="bg-zinc-100 dark:bg-slate-800/40 p-2 rounded min-w-[140px] border border-slate-200 dark:border-transparent">
                             <div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1">{k}</div>
                             <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto pr-1">
                               {arr.slice(0,50).map(val => (
-                                <button type="button" key={val} onClick={() => updateFilter(k, val)} className={`px-2 py-0.5 rounded text-[10px] border ${filters[k]?.includes(val) ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-700/60 border-slate-600 hover:border-slate-500'}`}>{val}</button>
+                                <button type="button" key={val} onClick={() => updateFilter(k, val)} className={`px-2 py-0.5 rounded text-[10px] border transition ${filters[k]?.includes(val) ? 'bg-blue-600 border-blue-500 text-white shadow-sm' : 'bg-white dark:bg-slate-700/60 border-slate-300 dark:border-slate-600 hover:border-blue-400 dark:hover:border-slate-500'}`}>{val}</button>
                               ))}
                             </div>
                           </div>
                         ))}
                       </div>
                       <div className="flex gap-2 pt-1">
-                        <button type="button" onClick={requestRefine} className="px-3 py-1.5 rounded bg-gradient-to-r from-blue-500 to-blue-700 text-white text-xs hover:from-blue-400 hover:to-blue-600">AI Refine (Prompt)</button>
-                        <button type="button" onClick={() => callBackendAggregate('manual')} className="px-3 py-1.5 rounded bg-slate-700 text-slate-200 text-xs hover:bg-slate-600">Refresh Data</button>
-                        <button type="button" onClick={() => { setFilters({ status: [], assignee: [], project: [] }); setForm(f => ({ ...f, group_by: chartSpec.meta.group_by, from: chartSpec.meta.from, to: chartSpec.meta.to })); }} className="px-3 py-1.5 rounded bg-slate-700 text-slate-200 text-xs hover:bg-slate-600">Reset</button>
+                        <button type="button" onClick={requestRefine} className="px-3 py-1.5 rounded bg-gradient-to-r from-blue-500 to-blue-700 text-white text-xs hover:from-blue-400 hover:to-blue-600 shadow">AI Refine (Prompt)</button>
+                        <button type="button" onClick={() => callBackendAggregate('manual')} className="px-3 py-1.5 rounded bg-zinc-200 text-slate-700 text-xs hover:bg-zinc-300 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600">Refresh Data</button>
+                        <button type="button" onClick={() => { setFilters({ status: [], assignee: [], project: [] }); setForm(f => ({ ...f, group_by: chartSpec.meta.group_by, from: chartSpec.meta.from, to: chartSpec.meta.to })); }} className="px-3 py-1.5 rounded bg-zinc-200 text-slate-700 text-xs hover:bg-zinc-300 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600">Reset</button>
                       </div>
                       <div className="text-[11px] text-slate-500">Prompt will be prepared in the input; you can adjust before sending.</div>
                     </div>
@@ -355,7 +359,7 @@ export default function Canvas() {
         </div>
       </div>
       <div ref={dragRef} onMouseDown={startDrag} className="w-1 bg-blue-500/30 cursor-col-resize hover:bg-blue-400/60 transition" />
-      <div className="flex flex-col bg-slate-900/70 min-w-[300px]" style={{ width: `${(1-canvasWidth)*100}%` }}>
+  <div className="flex flex-col bg-white dark:bg-slate-900/70 min-w-[300px] border-l border-slate-200 dark:border-blue-500/10" style={{ width: `${(1-canvasWidth)*100}%` }}>
         <div className="flex-1 overflow-y-auto p-4 min-h-0">
           {messages.map((m, i) => {
             const isTable = /\|[^\n]*\|/.test(m.content || '');
@@ -364,7 +368,7 @@ export default function Canvas() {
             return (
               <div key={i} className={`flex gap-3 my-4 ${m.sender === 'user' ? 'flex-row-reverse text-right' : ''}`}> 
                 <Avatar sender={m.sender} />
-                <div className={`max-w-full md:max-w-md lg:max-w-lg xl:max-w-xl p-3 rounded-lg prose prose-invert prose-sm break-words ${m.sender === 'user' ? 'bg-blue-600' : 'bg-slate-700'} [&_pre]:whitespace-pre-wrap [&_pre]:max-h-60 [&_pre]:overflow-y-auto [&_code]:break-words`} dangerouslySetInnerHTML={{ __html: marked.parse(m.content || '') }} />
+                <div className={`max-w-full md:max-w-md lg:max-w-lg xl:max-w-xl p-3 rounded-lg prose prose-sm break-words shadow-sm ${m.sender === 'user' ? 'bg-blue-600 text-white' : 'bg-zinc-100 text-slate-800 dark:bg-slate-700 dark:text-slate-100'} [&_pre]:whitespace-pre-wrap [&_pre]:max-h-60 [&_pre]:overflow-y-auto [&_code]:break-words`} dangerouslySetInnerHTML={{ __html: marked.parse(m.content || '') }} />
               </div>
             );
           })}
@@ -372,8 +376,8 @@ export default function Canvas() {
           <div ref={endRef} />
         </div>
         {error && <div className="text-red-400 text-xs px-4 mb-2">{error}</div>}
-        <form onSubmit={send} className="p-4 border-t border-blue-500/10 bg-slate-900/80 flex gap-2">
-          <input className="flex-1 rounded-lg bg-[#0f0f23]/80 border border-blue-500/30 px-3 py-2 text-slate-50 focus:outline-none focus:border-blue-400" placeholder="Ask for a visualization..." value={input} onChange={e => setInput(e.target.value)} />
+  <form onSubmit={send} className="p-4 border-t border-slate-200 dark:border-blue-500/10 bg-white/90 dark:bg-slate-900/80 backdrop-blur flex gap-2">
+          <input className="flex-1 rounded-lg bg-white dark:bg-[#0f0f23]/80 border border-slate-300 dark:border-blue-500/30 px-3 py-2 text-slate-800 dark:text-slate-50 focus:outline-none focus:border-blue-400" placeholder="Ask for a visualization..." value={input} onChange={e => setInput(e.target.value)} />
           <button disabled={loading || !input.trim()} className="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-blue-700 text-white disabled:opacity-50">Send</button>
         </form>
       </div>
