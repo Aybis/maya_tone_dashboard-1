@@ -2,7 +2,11 @@ from flask import Blueprint, request, jsonify, session
 import json, sqlite3
 from datetime import datetime, timedelta
 from ..prompts import get_base_system_prompt
-from ..config import MAX_CONTEXT_MESSAGES
+from ..config import (
+    MAX_CONTEXT_MESSAGES,
+    AZURE_OPENAI_DEPLOYMENT_NAME
+    # AZURE_OPENAI_API_KEY,  # Commented out - used for regular OpenAI fallback logic
+)
 from ..db import (
     insert_message,
     fetch_recent_messages,
@@ -16,6 +20,12 @@ from ..services.tool_dispatcher import execute as execute_tool
 from ..extensions import socketio  # For real-time emission of assistant replies
 
 chat_bp = Blueprint("chat", __name__)
+
+
+def get_model_name():
+    """Return the Azure OpenAI deployment name."""
+    return AZURE_OPENAI_DEPLOYMENT_NAME
+    # return AZURE_OPENAI_DEPLOYMENT_NAME if AZURE_OPENAI_API_KEY else "gpt-4o-mini"  # Commented out - regular OpenAI fallback
 
 
 # ---- Tool schema builder ---------------------------------------------------
@@ -47,6 +57,10 @@ def build_tools(current_date: str, month_start: str):
                         "to_date": {
                             "type": "string",
                             "description": "YYYY-MM-DD akhir (opsional)",
+                        },
+                        "max_results": {
+                            "type": "integer",
+                            "description": "Batasi jumlah grup dalam chart (contoh: 5 untuk top 5). Sisanya akan digabung ke 'Others'",
                         },
                         "jql_extra": {
                             "type": "string",
@@ -352,7 +366,7 @@ def ask(chat_id):
                 ]
             )
             second = client.chat.completions.create(
-                model="gpt-4o-mini", messages=messages_, temperature=0.1
+                model=get_model_name(), messages=messages_, temperature=0.1
             )
             return send(second.choices[0].message.content)
 
@@ -364,7 +378,7 @@ def ask(chat_id):
     month_start = now.replace(day=1).strftime("%Y-%m-%d")
     tools = build_tools(current_date, month_start)
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=get_model_name(),
         messages=messages_,
         tools=tools,
         tool_choice="auto",
@@ -492,7 +506,7 @@ def ask(chat_id):
         },
     ]
     second = client.chat.completions.create(
-        model="gpt-4o-mini", messages=summarizer_messages, temperature=0.1
+        model=get_model_name(), messages=summarizer_messages, temperature=0.1
     )
     return send(second.choices[0].message.content)
 
@@ -538,7 +552,7 @@ def ask_stream(chat_id):
 
     try:
         preview = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=get_model_name(),
             messages=messages_ + [{"role": "user", "content": user_message}],
             tools=tools,
             tool_choice="auto",
@@ -663,7 +677,7 @@ def ask_stream(chat_id):
             ]
             try:
                 stream2 = client.chat.completions.create(
-                    model="gpt-4o-mini",
+                    model=get_model_name(),
                     messages=summarizer_messages,
                     temperature=0.2,
                     stream=True,
@@ -696,7 +710,7 @@ def ask_stream(chat_id):
         socketio.emit("assistant_start", {"chat_id": chat_id}, room=chat_id)
         full = []
         stream = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=get_model_name(),
             messages=messages_ + [{"role": "user", "content": user_message}],
             temperature=0.2,
             stream=True,
@@ -806,7 +820,7 @@ def ask_new():
 
     try:
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=get_model_name(),
             messages=messages_,
             tools=tools,
             tool_choice="auto",
@@ -903,7 +917,7 @@ def ask_new():
                     },
                 ]
                 second = client.chat.completions.create(
-                    model="gpt-4o-mini", messages=summarizer_messages, temperature=0.1
+                    model=get_model_name(), messages=summarizer_messages, temperature=0.1
                 )
                 answer = second.choices[0].message.content
     else:
