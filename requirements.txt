@@ -6,3 +6,4 @@ openai
 flask-socketio
 jira
 numpy
+ 

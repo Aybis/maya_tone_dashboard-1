@@ -1,14 +1,21 @@
 import json, logging
-from ..config import OPENAI_API_KEY
+from ..config import (
+    AZURE_OPENAI_API_KEY,
+    AZURE_OPENAI_ENDPOINT,
+    AZURE_OPENAI_API_VERSION,
+    AZURE_OPENAI_DEPLOYMENT_NAME
+    # OPENAI_API_KEY  # Commented out - regular OpenAI fallback
+)
 
-"""OpenAI service helpers.
+"""Azure OpenAI service helpers.
 
-Handles dual import path (new openai>=1.x vs legacy) and provides:
-- get_client(): returns appropriate client or None if unavailable.
+Provides:
+- get_client(): returns Azure OpenAI client or None if unavailable.
 - check_confirmation_intent(): classify follow-up messages for pending tool action confirmation.
 """
 try:
-    from openai import OpenAI
+    from openai import AzureOpenAI
+    # from openai import OpenAI  # Commented out - regular OpenAI
 
     OPENAI_VERSION = "v1"
 except ImportError:  # legacy fallback
@@ -22,10 +29,30 @@ except ImportError:  # legacy fallback
 
 
 def get_client():
-    """Return an OpenAI client instance (new SDK or legacy) or None if key/missing package."""
-    if not OPENAI_API_KEY or not OPENAI_VERSION:
+    """Return an Azure OpenAI client instance or None if unavailable."""
+    if not OPENAI_VERSION or not AZURE_OPENAI_API_KEY or not AZURE_OPENAI_ENDPOINT:
         return None
-    return OpenAI(api_key=OPENAI_API_KEY) if OPENAI_VERSION == "v1" else openai
+    
+    # Azure OpenAI (Active)
+    if OPENAI_VERSION == "v1":
+        return AzureOpenAI(
+            api_key=AZURE_OPENAI_API_KEY,
+            azure_endpoint=AZURE_OPENAI_ENDPOINT,
+            api_version=AZURE_OPENAI_API_VERSION
+        )
+    else:
+        # Legacy Azure OpenAI setup
+        openai.api_type = "azure"
+        openai.api_key = AZURE_OPENAI_API_KEY
+        openai.api_base = AZURE_OPENAI_ENDPOINT
+        openai.api_version = AZURE_OPENAI_API_VERSION
+        return openai
+    
+    # Regular OpenAI (Commented out - can be enabled if needed)
+    # if OPENAI_API_KEY:
+    #     return OpenAI(api_key=OPENAI_API_KEY) if OPENAI_VERSION == "v1" else openai
+    
+    # return None
 
 
 def check_confirmation_intent(user_message: str, client):
@@ -46,8 +73,12 @@ def check_confirmation_intent(user_message: str, client):
     if not client:
         return {"intent": "other"}
     try:
+        # Use Azure OpenAI deployment name
+        model_name = AZURE_OPENAI_DEPLOYMENT_NAME
+        # model_name = AZURE_OPENAI_DEPLOYMENT_NAME if AZURE_OPENAI_API_KEY else "gpt-4o-mini"  # Commented out - regular OpenAI fallback
+        
         resp = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=model_name,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_message},

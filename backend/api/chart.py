@@ -23,17 +23,12 @@ def aggregate():
         "from": "YYYY-MM-DD"?,
         "to": "YYYY-MM-DD"?,
         "filters": { "status":[], "assignee":[], "project":[] }?,
-        "type": "bar" | "doughnut" | "line" | "pie"?   # optional explicit chart type override
+        "type": "bar" | "doughnut" | "line" | "pie"?,
+        "max_results": 5?  # NEW: limit number of groups in chart
       }
 
     Response JSON (success):
       { success: true, chart: { title, type, labels, datasets:[...], meta:{...} , notes, distincts? }, raw: <original aggregation> }
-
-    Logic:
-    - Builds optional JQL filter clause from provided filters.
-    - Delegates aggregation to jira_utils.aggregate_issues.
-    - Heuristically selects chart type if not provided.
-    - Returns frontend-friendly spec including color palette.
     """
     data = request.json or {}
     group_by = data.get("group_by", "status")
@@ -41,6 +36,7 @@ def aggregate():
     to_date = data.get("to") or None
     filters = data.get("filters", {}) or {}
     chart_type = data.get("type")
+    max_results = data.get("max_results")  # NEW: get max_results from request
 
     # Build JQL filter clauses from lists (ignore 'all' semantics)
     clauses = []
@@ -72,8 +68,28 @@ def aggregate():
     if err:
         return jsonify({"success": False, "error": err}), 400
 
-    labels = [item["label"] for item in agg.get("counts", [])]
-    values = [item["value"] for item in agg.get("counts", [])]
+    # Get the original counts data
+    counts_data = agg.get("counts", [])
+    
+    # NEW: Apply max_results limit to the aggregated data
+    limited_data = counts_data
+    others_count = 0
+    
+    if max_results and isinstance(max_results, int) and max_results > 0 and len(counts_data) > max_results:
+        if group_by == "created_date":
+            # For date grouping, keep chronological order and limit
+            limited_data = counts_data[:max_results]
+        else:
+            # For other groupings, take top N by value (data is already sorted by value desc)
+            limited_data = counts_data[:max_results]
+            # Calculate "Others" category for remaining items
+            others_items = counts_data[max_results:]
+            others_count = sum(item["value"] for item in others_items)
+            if others_count > 0:
+                limited_data.append({"label": "Others", "value": others_count})
+
+    labels = [item["label"] for item in limited_data]
+    values = [item["value"] for item in limited_data]
 
     # Heuristic chart type if not provided
     if not chart_type:
@@ -100,8 +116,13 @@ def aggregate():
     ]
     colors = [palette[i % len(palette)] for i in range(len(values))]
 
+    # Create title with appropriate suffix
+    title_suffix = ""
+    if max_results and len(counts_data) > max_results:
+        title_suffix = f" (Top {max_results})"
+    
     chart_spec = {
-        "title": f"Distribusi Issue by {group_by}",
+        "title": f"Distribusi Issue by {group_by}{title_suffix}",
         "type": chart_type,
         "labels": labels,
         "datasets": [
@@ -117,14 +138,18 @@ def aggregate():
             "from": agg.get("from"),
             "to": agg.get("to"),
             "source": "jira",
+            "max_results": max_results,
+            "total_groups": len(counts_data),  # NEW: show original number of groups
+            "showing_groups": len(limited_data),  # NEW: show limited number of groups
             "filters": {
                 "status": filters.get("status", []),
                 "assignee": filters.get("assignee", []),
                 "project": filters.get("project", []),
             },
         },
-        "notes": f"Total {agg.get('total',0)} issue.",
+        "notes": f"Total {agg.get('total',0)} issues across {len(counts_data)} groups" + (f", showing top {max_results}" if max_results and len(counts_data) > max_results else "") + ".",
     }
     if "distincts" in agg:
         chart_spec["distincts"] = agg["distincts"]
+    
     return jsonify({"success": True, "chart": chart_spec, "raw": agg})

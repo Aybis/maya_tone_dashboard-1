@@ -3,13 +3,17 @@ import json, sqlite3
 from datetime import datetime, timedelta
 from uuid import uuid4
 from .config import (
-    OPENAI_API_KEY,
+    AZURE_OPENAI_API_KEY,
+    AZURE_OPENAI_ENDPOINT,
+    AZURE_OPENAI_API_VERSION,
+    AZURE_OPENAI_DEPLOYMENT_NAME,
+    # OPENAI_API_KEY,  # Commented out - regular OpenAI fallback
     JIRA_BASE_URL,
     JIRA_USERNAME,
     JIRA_PASSWORD,
     MAX_CONTEXT_MESSAGES,
 )
-from .prompts import BASE_SYSTEM_PROMPT
+from .prompts import get_base_system_prompt
 from .db import (
     insert_message,
     fetch_recent_messages,
@@ -21,7 +25,8 @@ from .db import (
 from .jira_utils import aggregate_issues
 
 try:
-    from openai import OpenAI
+    from openai import AzureOpenAI
+    # from openai import OpenAI  # Commented out - regular OpenAI
 
     OPENAI_VERSION = "v1"
 except ImportError:
@@ -43,9 +48,29 @@ chat_bp = Blueprint("chat_bp", __name__)
 
 
 def init_openai_client():
-    if not OPENAI_VERSION or not OPENAI_API_KEY:
+    if not OPENAI_VERSION or not AZURE_OPENAI_API_KEY or not AZURE_OPENAI_ENDPOINT:
         return None
-    return OpenAI(api_key=OPENAI_API_KEY) if OPENAI_VERSION == "v1" else openai
+    
+    # Azure OpenAI (Active)
+    if OPENAI_VERSION == "v1":
+        return AzureOpenAI(
+            api_key=AZURE_OPENAI_API_KEY,
+            azure_endpoint=AZURE_OPENAI_ENDPOINT,
+            api_version=AZURE_OPENAI_API_VERSION
+        )
+    else:
+        # Legacy Azure OpenAI setup
+        openai.api_type = "azure"
+        openai.api_key = AZURE_OPENAI_API_KEY
+        openai.api_base = AZURE_OPENAI_ENDPOINT
+        openai.api_version = AZURE_OPENAI_API_VERSION
+        return openai
+    
+    # Regular OpenAI (Commented out - can be enabled if needed)
+    # elif OPENAI_API_KEY:
+    #     return OpenAI(api_key=OPENAI_API_KEY) if OPENAI_VERSION == "v1" else openai
+    
+    # return None
 
 
 def init_jira():
@@ -108,7 +133,7 @@ def ask(chat_id):
                 return send(f"❌ Error eksekusi: {err}")
             history = fetch_recent_messages(chat_id, MAX_CONTEXT_MESSAGES)
             messages = (
-                [{"role": "system", "content": BASE_SYSTEM_PROMPT}]
+                [{"role": "system", "content": get_base_system_prompt("currentUser()")}]
                 + history
                 + [
                     {
@@ -117,15 +142,18 @@ def ask(chat_id):
                     }
                 ]
             )
+            # Use Azure OpenAI deployment name
+            model_name = AZURE_OPENAI_DEPLOYMENT_NAME
+            # model_name = AZURE_OPENAI_DEPLOYMENT_NAME if AZURE_OPENAI_API_KEY else "gpt-4o-mini"  # Commented out - regular OpenAI fallback
             second = client.chat.completions.create(
-                model="gpt-4o-mini", messages=messages, temperature=0.1
+                model=model_name, messages=messages, temperature=0.1
             )
             return send(second.choices[0].message.content)
         # else fallthrough
 
     # Normal flow
     history = fetch_recent_messages(chat_id, MAX_CONTEXT_MESSAGES)
-    messages = [{"role": "system", "content": BASE_SYSTEM_PROMPT}] + history
+    messages = [{"role": "system", "content": get_base_system_prompt("currentUser()")}] + history
 
     # Tools definition (duplicate of app for now; could be centralized)
     now = datetime.now()
@@ -177,8 +205,11 @@ def ask(chat_id):
         },
     ]
 
+    # Use Azure OpenAI deployment name
+    model_name = AZURE_OPENAI_DEPLOYMENT_NAME
+    # model_name = AZURE_OPENAI_DEPLOYMENT_NAME if AZURE_OPENAI_API_KEY else "gpt-4o-mini"  # Commented out - regular OpenAI fallback
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=model_name,
         messages=messages,
         tools=tools,
         tool_choice="auto",

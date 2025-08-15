@@ -320,13 +320,15 @@ def aggregate_issues(
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,
     jql_extra: Optional[str] = None,
-    max_results: int = 500,
+    max_results: int = 500,  # This limits Jira API results, not chart groups
 ) -> Tuple[Optional[dict], Optional[str]]:
     if jira_manager is None:
         return None, "Jira manager belum terinisialisasi."
+    
     allowed = {"status", "priority", "assignee", "type", "created_date"}
     if group_by not in allowed:
         return None, f"group_by harus salah satu dari {allowed}"
+    
     clauses = []
     date_field = "created" if group_by == "created_date" else "updated"
     if from_date:
@@ -335,16 +337,23 @@ def aggregate_issues(
         clauses.append(f'{date_field} <= "{to_date}"')
     if jql_extra:
         clauses.append(f"({jql_extra})")
+    
     jql = " AND ".join(clauses) if clauses else f"{date_field} >= -30d"
+    
     issues = jira_manager.search_issues(jql, max_results)
     counter = _Counter()
+    
+    # Collect distinct values
     distinct_status = set()
     distinct_assignee = set()
     distinct_project = set()
     distinct_priority = set()
     distinct_type = set()
+    
     for issue in issues:
         f = issue.get("fields", {})
+        
+        # Determine the grouping key
         if group_by == "status":
             key = (f.get("status") or {}).get("name", "Unknown")
         elif group_by == "priority":
@@ -357,39 +366,39 @@ def aggregate_issues(
             key = (f.get("created") or "")[:10] or "Unknown"
         else:
             key = "Unknown"
+        
         counter[key] += 1
-        # collect distincts
+        
+        # Collect distincts for filters
         distinct_status.add((f.get("status") or {}).get("name", "Unknown"))
         distinct_priority.add((f.get("priority") or {}).get("name", "Medium"))
-        distinct_assignee.add(
-            (f.get("assignee") or {}).get("displayName", "Unassigned")
-        )
+        distinct_assignee.add((f.get("assignee") or {}).get("displayName", "Unassigned"))
         distinct_type.add((f.get("issuetype") or {}).get("name", "Unknown"))
         proj = (f.get("project") or {}).get("key") if f.get("project") else None
         if proj:
             distinct_project.add(proj)
-    items = sorted(
-        counter.items(),
-        key=lambda x: (
-            x[0] if group_by == "created_date" else -x[1],
-            x[0] if group_by != "created_date" else "",
-        ),
-    )
-    data = [
-        {"label": k, "value": v}
-        for k, v in (
-            items
-            if group_by == "created_date"
-            else sorted(counter.items(), key=lambda x: (-x[1], x[0]))
-        )
-    ]
+    
+    # Sort the data appropriately
+    if group_by == "created_date":
+        # For dates, sort chronologically (ascending by date)
+        data = [
+            {"label": k, "value": v}
+            for k, v in sorted(counter.items(), key=lambda x: x[0])  # Sort by date string
+        ]
+    else:
+        # For all other groupings, sort by count (descending) then by label
+        data = [
+            {"label": k, "value": v}
+            for k, v in sorted(counter.items(), key=lambda x: (-x[1], x[0]))  # Sort by count desc, then label asc
+        ]
+    
     return (
         {
             "group_by": group_by,
             "from": from_date,
             "to": to_date,
             "total": sum(counter.values()),
-            "counts": data,
+            "counts": data,  # This is now properly sorted
             "jql": jql,
             "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "distincts": {
