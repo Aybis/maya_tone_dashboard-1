@@ -4,11 +4,11 @@ import React, {
   useRef,
   useCallback,
   useMemo,
-} from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { marked } from "marked";
-import { io } from "socket.io-client";
-import { useChatContext } from "../context/ChatContext";
+} from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { marked } from 'marked';
+import { io } from 'socket.io-client';
+import { useChatContext } from '../context/ChatContext';
 import {
   Chart as ChartJS,
   ArcElement,
@@ -19,8 +19,8 @@ import {
   LineElement,
   Tooltip,
   Legend,
-} from "chart.js";
-import { Bar, Doughnut, Pie, Line } from "react-chartjs-2";
+} from 'chart.js';
+import { Bar, Doughnut, Pie, Line } from 'react-chartjs-2';
 
 ChartJS.register(
   ArcElement,
@@ -30,16 +30,16 @@ ChartJS.register(
   PointElement,
   LineElement,
   Tooltip,
-  Legend
+  Legend,
 );
 
 const Avatar = ({ sender }) => (
   <div
     className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${
-      sender === "user" ? "bg-blue-500" : "bg-slate-600"
+      sender === 'user' ? 'bg-blue-500' : 'bg-slate-600'
     }`}
   >
-    {sender === "user" ? "U" : "M"}
+    {sender === 'user' ? 'U' : 'M'}
   </div>
 );
 
@@ -53,9 +53,9 @@ export default function Canvas() {
   const { chatId } = useParams();
   const navigate = useNavigate();
   const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
   const socketRef = useRef(null);
   const endRef = useRef(null);
 
@@ -76,7 +76,7 @@ export default function Canvas() {
         const data = await res.json();
         if (!ignore) setMessages(data);
       } catch (e) {
-        if (!ignore) setError("Failed to load messages");
+        if (!ignore) setError('Failed to load messages');
       } finally {
         if (!ignore) setLoading(false);
       }
@@ -89,15 +89,15 @@ export default function Canvas() {
 
   useEffect(() => {
     if (!activeChatId) return;
-    socketRef.current = io("http://localhost:4000");
-    socketRef.current.emit("join_chat", { chat_id: activeChatId });
-    socketRef.current.on("new_message", (data) => {
+    socketRef.current = io('http://localhost:4000');
+    socketRef.current.emit('join_chat', { chat_id: activeChatId });
+    socketRef.current.on('new_message', (data) => {
       if (data.chat_id === activeChatId) {
         setMessages((prev) => {
-          if (data.sender === "assistant") {
+          if (data.sender === 'assistant') {
             const lastAssistant = [...prev]
               .reverse()
-              .find((m) => m.sender === "assistant");
+              .find((m) => m.sender === 'assistant');
             if (lastAssistant && lastAssistant.content === data.content)
               return prev; // dedupe
           }
@@ -107,21 +107,21 @@ export default function Canvas() {
       }
     });
     // Streaming events
-    socketRef.current.on("assistant_start", ({ chat_id }) => {
+    socketRef.current.on('assistant_start', ({ chat_id }) => {
       if (chat_id === activeChatId) {
         setLoading(true);
-        setMessages((prev) => [...prev, { sender: "assistant", content: "" }]);
+        setMessages((prev) => [...prev, { sender: 'assistant', content: '' }]);
       }
     });
-    socketRef.current.on("assistant_delta", ({ chat_id, delta }) => {
+    socketRef.current.on('assistant_delta', ({ chat_id, delta }) => {
       if (chat_id === activeChatId) {
         setMessages((prev) => {
           const copy = [...prev];
           for (let i = copy.length - 1; i >= 0; i--) {
-            if (copy[i].sender === "assistant") {
+            if (copy[i].sender === 'assistant') {
               copy[i] = {
                 ...copy[i],
-                content: (copy[i].content || "") + delta,
+                content: (copy[i].content || '') + delta,
               };
               break;
             }
@@ -130,12 +130,12 @@ export default function Canvas() {
         });
       }
     });
-    socketRef.current.on("assistant_end", ({ chat_id, content }) => {
+    socketRef.current.on('assistant_end', ({ chat_id, content }) => {
       if (chat_id === activeChatId) {
         setMessages((prev) => {
           const copy = [...prev];
           for (let i = copy.length - 1; i >= 0; i--) {
-            if (copy[i].sender === "assistant") {
+            if (copy[i].sender === 'assistant') {
               copy[i] = { ...copy[i], content };
               break;
             }
@@ -146,7 +146,7 @@ export default function Canvas() {
         setActiveChatHasMessages(true);
       }
     });
-    socketRef.current.on("assistant_error", ({ chat_id, error }) => {
+    socketRef.current.on('assistant_error', ({ chat_id, error }) => {
       if (chat_id === activeChatId) {
         setError(error);
         setLoading(false);
@@ -158,53 +158,53 @@ export default function Canvas() {
   }, [activeChatId]);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
+    endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   const send = async (e) => {
     e.preventDefault();
     if (!input.trim() || loading) return;
     const content = input;
-    setInput("");
+    setInput('');
     setLoading(true);
-    setError("");
+    setError('');
     // If no active chat yet (user just on /canvas), create + ask in one go
     if (!activeChatId) {
       try {
-        const res = await fetch("/api/chat/ask_new", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+        const res = await fetch('/api/chat/ask_new', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: content }),
         });
         const data = await res.json();
-        if (!res.ok || !data.success) throw new Error(data.answer || "Fail");
+        if (!res.ok || !data.success) throw new Error(data.answer || 'Fail');
         setMessages([
-          { sender: "user", content },
-          { sender: "assistant", content: data.answer },
+          { sender: 'user', content },
+          { sender: 'assistant', content: data.answer },
         ]);
         setActiveChatId(data.chat_id);
         setActiveChatHasMessages(true);
         refreshChats?.();
         navigate(`/chat/${data.chat_id}`, { replace: true });
       } catch (err) {
-        setError("Failed to start chat");
+        setError('Failed to start chat');
       } finally {
         setLoading(false);
       }
       return;
     }
     // Existing chat flow
-    const msg = { sender: "user", content };
+    const msg = { sender: 'user', content };
     setMessages((prev) => [...prev, msg]);
     try {
       await fetch(`/api/chat/${activeChatId}/ask_stream`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: content }),
       });
       // Stream events will handle state updates
     } catch (err) {
-      setError("Failed to send");
+      setError('Failed to send');
       setLoading(false);
     }
   };
@@ -213,8 +213,8 @@ export default function Canvas() {
   // Extract latest assistant message containing either a markdown table OR a chart specification fence
   const latestAssistant = useMemo(() => {
     return [...messages].reverse().find((m) => {
-      if (m.sender === "user") return false;
-      const content = m.content || "";
+      if (m.sender === 'user') return false;
+      const content = m.content || '';
       const hasTable = /\|[^\n]*\|/.test(content);
       const hasChartFence = /```chart[\s\S]*?```/i.test(content);
       return hasTable || hasChartFence;
@@ -224,7 +224,7 @@ export default function Canvas() {
   // Parse chart specification from assistant message (if present)
   const chartSpec = useMemo(() => {
     if (!latestAssistant) return null;
-    const content = latestAssistant.content || "";
+    const content = latestAssistant.content || '';
     const match = content.match(/```chart\s*\n([\s\S]*?)```/i);
     if (!match) return null;
     try {
@@ -249,25 +249,25 @@ export default function Canvas() {
     const baseOptions = {
       responsive: true,
       maintainAspectRatio: true,
-      aspectRatio: type === "doughnut" || type === "pie" ? 1.4 : 1.6,
+      aspectRatio: type === 'doughnut' || type === 'pie' ? 1.4 : 1.6,
       plugins: {
-        legend: { display: true, position: "bottom" },
+        legend: { display: true, position: 'bottom' },
         title: {
           display: !!effectiveChartSpec.title,
           text: effectiveChartSpec.title,
         },
       },
     };
-    if (type === "bar" || type === "bar-vertical") {
+    if (type === 'bar' || type === 'bar-vertical') {
       return <Bar data={data} options={baseOptions} />;
     }
-    if (type === "bar-horizontal") {
-      const options = { ...baseOptions, indexAxis: "y" };
+    if (type === 'bar-horizontal') {
+      const options = { ...baseOptions, indexAxis: 'y' };
       return <Bar data={data} options={options} />;
     }
-    if (type === "line") return <Line data={data} options={baseOptions} />;
-    if (type === "pie") return <Pie data={data} options={baseOptions} />;
-    if (type === "doughnut")
+    if (type === 'line') return <Line data={data} options={baseOptions} />;
+    if (type === 'pie') return <Pie data={data} options={baseOptions} />;
+    if (type === 'doughnut')
       return <Doughnut data={data} options={baseOptions} />;
     return null;
   }, [effectiveChartSpec]);
@@ -280,7 +280,7 @@ export default function Canvas() {
   });
   const availableFilters = useMemo(
     () => chartSpec?.meta?.filters || {},
-    [chartSpec]
+    [chartSpec],
   );
   const updateFilter = (key, value) => {
     setFilters((prev) => ({
@@ -291,14 +291,14 @@ export default function Canvas() {
     }));
   };
   // --- Dynamic Form State ---
-  const [form, setForm] = useState({ group_by: "", from: "", to: "" });
+  const [form, setForm] = useState({ group_by: '', from: '', to: '' });
   // Initialize form whenever a new chart arrives
   useEffect(() => {
     if (chartSpec?.meta) {
       setForm({
-        group_by: chartSpec.meta.group_by || "status",
-        from: chartSpec.meta.from || "",
-        to: chartSpec.meta.to || "",
+        group_by: chartSpec.meta.group_by || 'status',
+        from: chartSpec.meta.from || '',
+        to: chartSpec.meta.to || '',
       });
       // seed filters from meta
       if (chartSpec.meta.filters) setFilters(chartSpec.meta.filters);
@@ -316,15 +316,15 @@ export default function Canvas() {
     }
     return {
       status:
-        chartSpec?.meta?.group_by === "status"
+        chartSpec?.meta?.group_by === 'status'
           ? chartSpec?.labels || []
           : chartSpec?.meta?.filters?.status || [],
       assignee:
-        chartSpec?.meta?.group_by === "assignee"
+        chartSpec?.meta?.group_by === 'assignee'
           ? chartSpec?.labels || []
           : chartSpec?.meta?.filters?.assignee || [],
       project:
-        chartSpec?.meta?.group_by === "project"
+        chartSpec?.meta?.group_by === 'project'
           ? chartSpec?.labels || []
           : chartSpec?.meta?.filters?.project || [],
     };
@@ -334,14 +334,14 @@ export default function Canvas() {
   useEffect(() => {
     if (!chartSpec) return;
     if (!autoInsight) return;
-    const content = latestAssistant?.content || "";
+    const content = latestAssistant?.content || '';
     if (/Insight:/i.test(content)) return; // already has insight
     setInput(
       (prev) =>
         prev ||
         `Berikan insight singkat (1-2 kalimat) tentang distribusi ${
-          chartSpec.meta?.group_by || "data"
-        } di atas. Mulai langsung tanpa salam.`
+          chartSpec.meta?.group_by || 'data'
+        } di atas. Mulai langsung tanpa salam.`,
     );
   }, [chartSpec, autoInsight, latestAssistant]);
 
@@ -353,11 +353,11 @@ export default function Canvas() {
     const { group_by, from, to } = form;
     const filterSegments = Object.entries(filters)
       .filter(([, arr]) => arr.length)
-      .map(([k, arr]) => `${k}=${arr.join(",")}`);
+      .map(([k, arr]) => `${k}=${arr.join(',')}`);
     return `Refine the previous chart using aggregate_issues. group_by=${group_by}. from=${
-      from || "unchanged"
-    } to=${to || "unchanged"} filters=${
-      filterSegments.join("; ") || "none"
+      from || 'unchanged'
+    } to=${to || 'unchanged'} filters=${
+      filterSegments.join('; ') || 'none'
     }. Return ONLY a chart spec code fence (chart).`;
   };
 
@@ -372,13 +372,13 @@ export default function Canvas() {
 
   // Direct backend aggregation call (B)
   const callBackendAggregate = useCallback(
-    async (reason = "change") => {
+    async (reason = 'change') => {
       if (fetchingRef.current) return;
       fetchingRef.current = true;
       try {
-        const res = await fetch("/api/chart/aggregate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+        const res = await fetch('/api/chart/aggregate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             group_by: form.group_by,
             from: form.from || null,
@@ -388,11 +388,11 @@ export default function Canvas() {
         });
         const data = await res.json();
         if (data.success) {
-          if (autoInsight && reason === "change") {
+          if (autoInsight && reason === 'change') {
             setLiveChart(data.chart);
             const prompt = `Provide a concise updated insight (no greeting). Group by ${
               form.group_by
-            }. Range ${form.from || "default"} to ${form.to || "default"}.`;
+            }. Range ${form.from || 'default'} to ${form.to || 'default'}.`;
             setInput(prompt);
           }
         }
@@ -402,7 +402,7 @@ export default function Canvas() {
         fetchingRef.current = false;
       }
     },
-    [form, filters, autoInsight]
+    [form, filters, autoInsight],
   );
 
   // Auto trigger (A) debounce
@@ -413,13 +413,13 @@ export default function Canvas() {
   // }, [form.group_by, form.from, form.to, filters, callBackendAggregate]);
 
   const [canvasWidth, setCanvasWidth] = useState(0.55); // fraction of container (slightly smaller chart pane)
-  const [chartSize, setChartSize] = useState("md"); // sm | md | lg
+  const [chartSize, setChartSize] = useState('md'); // sm | md | lg
   const chartSizeClass =
-    chartSize === "sm"
-      ? "max-w-[380px]"
-      : chartSize === "lg"
-      ? "max-w-[860px]"
-      : "max-w-[640px]";
+    chartSize === 'sm'
+      ? 'max-w-[380px]'
+      : chartSize === 'lg'
+      ? 'max-w-[860px]'
+      : 'max-w-[640px]';
   const dragRef = useRef(null);
   const containerRef = useRef(null);
 
@@ -436,13 +436,13 @@ export default function Canvas() {
         setCanvasWidth(next);
       };
       const onUp = () => {
-        window.removeEventListener("mousemove", onMove);
-        window.removeEventListener("mouseup", onUp);
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
       };
-      window.addEventListener("mousemove", onMove);
-      window.addEventListener("mouseup", onUp);
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
     },
-    [canvasWidth]
+    [canvasWidth],
   );
 
   return (
@@ -489,15 +489,15 @@ export default function Canvas() {
                   </div>
                   <div className="flex gap-2 text-xs">
                     <span className="text-slate-500">Size:</span>
-                    {["sm", "md", "lg"].map((s) => (
+                    {['sm', 'md', 'lg'].map((s) => (
                       <button
                         key={s}
                         type="button"
                         onClick={() => setChartSize(s)}
                         className={`px-2 py-1 rounded border text-[11px] ${
                           chartSize === s
-                            ? "bg-blue-600 border-blue-500 text-white"
-                            : "bg-slate-800/60 border-slate-600 hover:border-slate-500"
+                            ? 'bg-blue-600 border-blue-500 text-white'
+                            : 'bg-slate-800/60 border-slate-600 hover:border-slate-500'
                         }`}
                       >
                         {s}
@@ -514,16 +514,16 @@ export default function Canvas() {
                           <select
                             value={form.group_by}
                             onChange={(e) =>
-                              updateForm("group_by", e.target.value)
+                              updateForm('group_by', e.target.value)
                             }
                             className="bg-slate-800/70 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none focus:border-blue-500"
                           >
                             {[
-                              "status",
-                              "priority",
-                              "assignee",
-                              "type",
-                              "created_date",
+                              'status',
+                              'priority',
+                              'assignee',
+                              'type',
+                              'created_date',
                             ].map((g) => (
                               <option key={g} value={g}>
                                 {g}
@@ -538,7 +538,7 @@ export default function Canvas() {
                           <input
                             type="date"
                             value={form.from}
-                            onChange={(e) => updateForm("from", e.target.value)}
+                            onChange={(e) => updateForm('from', e.target.value)}
                             className="bg-slate-800/70 border border-slate-600 rounded px-2 py-1 text-xs"
                           />
                         </div>
@@ -549,7 +549,7 @@ export default function Canvas() {
                           <input
                             type="date"
                             value={form.to}
-                            onChange={(e) => updateForm("to", e.target.value)}
+                            onChange={(e) => updateForm('to', e.target.value)}
                             className="bg-slate-800/70 border border-slate-600 rounded px-2 py-1 text-xs"
                           />
                         </div>
@@ -572,8 +572,8 @@ export default function Canvas() {
                                     onClick={() => updateFilter(k, val)}
                                     className={`px-2 py-0.5 rounded text-[10px] border ${
                                       filters[k]?.includes(val)
-                                        ? "bg-blue-600 border-blue-500 text-white"
-                                        : "bg-slate-700/60 border-slate-600 hover:border-slate-500"
+                                        ? 'bg-blue-600 border-blue-500 text-white'
+                                        : 'bg-slate-700/60 border-slate-600 hover:border-slate-500'
                                     }`}
                                   >
                                     {val}
@@ -581,7 +581,7 @@ export default function Canvas() {
                                 ))}
                               </div>
                             </div>
-                          )
+                          ),
                         )}
                       </div>
                       <div className="flex gap-2 pt-1">
@@ -594,7 +594,7 @@ export default function Canvas() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => callBackendAggregate("manual")}
+                          onClick={() => callBackendAggregate('manual')}
                           className="px-3 py-1.5 rounded bg-slate-700 text-slate-200 text-xs hover:bg-slate-600"
                         >
                           Refresh Data
@@ -631,10 +631,10 @@ export default function Canvas() {
                 className="prose prose-invert max-w-none [&_table]:w-full [&_table]:text-xs [&_table]:border [&_table]:border-slate-600/50 [&_th]:font-semibold [&_th]:text-slate-300 [&_th]:border [&_th]:border-slate-700/50 [&_td]:border [&_td]:border-slate-700/50 [&_td]:align-top [&_tbody_tr:nth-child(even)]:bg-slate-800/30"
                 dangerouslySetInnerHTML={{
                   __html: marked.parse(
-                    (latestAssistant.content || "").replace(
+                    (latestAssistant.content || '').replace(
                       /```chart[\s\S]*?```/gi,
-                      ""
-                    )
+                      '',
+                    ),
                   ),
                 }}
               />
@@ -658,23 +658,23 @@ export default function Canvas() {
       >
         <div className="flex-1 overflow-y-auto p-4 min-h-0">
           {messages.map((m, i) => {
-            const isTable = /\|[^\n]*\|/.test(m.content || "");
+            const isTable = /\|[^\n]*\|/.test(m.content || '');
             // Skip assistant table messages (they go to canvas) but always show user + non-table assistant text
-            if (m.sender !== "user" && isTable) return null;
+            if (m.sender !== 'user' && isTable) return null;
             return (
               <div
                 key={i}
                 className={`flex gap-3 my-4 ${
-                  m.sender === "user" ? "flex-row-reverse text-right" : ""
+                  m.sender === 'user' ? 'flex-row-reverse' : ''
                 }`}
               >
                 <Avatar sender={m.sender} />
                 <div
                   className={`max-w-full md:max-w-md lg:max-w-lg xl:max-w-xl p-3 rounded-lg prose prose-invert prose-sm break-words ${
-                    m.sender === "user" ? "bg-blue-600" : "bg-slate-700"
+                    m.sender === 'user' ? 'bg-blue-600' : 'bg-slate-700'
                   } [&_pre]:whitespace-pre-wrap [&_pre]:max-h-60 [&_pre]:overflow-y-auto [&_code]:break-words`}
                   dangerouslySetInnerHTML={{
-                    __html: marked.parse(m.content || ""),
+                    __html: marked.parse(m.content || ''),
                   }}
                 />
               </div>

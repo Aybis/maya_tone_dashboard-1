@@ -1,5 +1,5 @@
-import React, { useMemo } from "react";
-import { Bar, Doughnut, Pie } from "react-chartjs-2";
+import React, { useMemo } from 'react';
+import { Bar, Doughnut, Pie } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -8,8 +8,8 @@ import {
   ArcElement,
   Tooltip,
   Legend,
-} from "chart.js";
-import { useDashboard } from "../context/DashboardContext";
+} from 'chart.js';
+import { useDashboard } from '../context/DashboardContext';
 
 ChartJS.register(
   CategoryScale,
@@ -17,17 +17,17 @@ ChartJS.register(
   BarElement,
   ArcElement,
   Tooltip,
-  Legend
+  Legend,
 );
 
-function SummaryCard({ title, value, subtitle = null, className = "" }) {
+function SummaryCard({ title, value, subtitle = null, className = '' }) {
   return (
     <div
       className={`bg-[#0f0f23]/80 border border-blue-500/10 rounded-lg p-4 shadow flex flex-col justify-between ${className}`}
     >
       <div className="text-slate-400 text-sm font-medium">{title}</div>
       <div className="text-2xl font-bold text-slate-50 mt-1">
-        {value !== null && value !== undefined ? value : "–"}
+        {value !== null && value !== undefined ? value : '–'}
       </div>
       {subtitle && (
         <div className="text-xs text-slate-500 mt-1">{subtitle}</div>
@@ -75,9 +75,9 @@ export default function Dashboard() {
       labels,
       datasets: [
         {
-          label: "Status",
+          label: 'Status',
           data: values,
-          backgroundColor: labels.map((l) => "#60a5fa"),
+          backgroundColor: labels.map((l) => '#60a5fa'),
         },
       ],
     };
@@ -86,7 +86,7 @@ export default function Dashboard() {
   const priorityChart = useMemo(() => {
     const labels = Object.keys(data?.distributions?.priority || {});
     const values = Object.values(data?.distributions?.priority || {});
-    const colors = ["#f87171", "#fbbf24", "#4ade80", "#a78bfa", "#60a5fa"];
+    const colors = ['#f87171', '#fbbf24', '#4ade80', '#a78bfa', '#60a5fa'];
     return {
       labels,
       datasets: [
@@ -102,13 +102,13 @@ export default function Dashboard() {
     const labels = Object.keys(data?.distributions?.assignees || {});
     const values = Object.values(data?.distributions?.assignees || {});
     return {
-      labels: labels.map((l) => (l.length > 20 ? l.slice(0, 17) + "…" : l)),
+      labels: labels.map((l) => (l.length > 20 ? l.slice(0, 17) + '…' : l)),
       datasets: [
         {
-          label: "Assigned Tickets",
+          label: 'Assigned Tickets',
           data: values,
-          backgroundColor: "#4ade80",
-          borderColor: "#22c55e",
+          backgroundColor: '#4ade80',
+          borderColor: '#22c55e',
           borderWidth: 1,
         },
       ],
@@ -119,16 +119,16 @@ export default function Dashboard() {
     const labels = Object.keys(data?.distributions?.types || {});
     const values = Object.values(data?.distributions?.types || {});
     const colors = [
-      "#a78bfa",
-      "#34d399",
-      "#fbbf24",
-      "#f87171",
-      "#60a5fa",
-      "#c084fc",
-      "#fde047",
-      "#fb7185",
-      "#4ade80",
-      "#94a3b8",
+      '#a78bfa',
+      '#34d399',
+      '#fbbf24',
+      '#f87171',
+      '#60a5fa',
+      '#c084fc',
+      '#fde047',
+      '#fb7185',
+      '#4ade80',
+      '#94a3b8',
     ];
     return {
       labels,
@@ -146,9 +146,9 @@ export default function Dashboard() {
   const todayStats = useMemo(() => {
     const personal = data?.personal?.today || {};
     return [
-      { title: "Due Today", value: personal.due_today },
-      { title: "Overdue", value: personal.overdue },
-      { title: "Reviews", value: personal.reviews_waiting },
+      { title: 'Due Today', value: personal.due_today },
+      { title: 'Overdue', value: personal.overdue },
+      { title: 'Reviews', value: personal.reviews_waiting },
     ];
   }, [data]);
 
@@ -156,15 +156,15 @@ export default function Dashboard() {
     const personal = data?.personal?.risks || {};
     return [
       {
-        title: "Pred. Slips",
+        title: 'Pred. Slips',
         value: personal.predicted_slips,
       },
       {
-        title: "Blocked",
+        title: 'Blocked',
         value: personal.blocked_count,
       },
       {
-        title: "Aging p90 (d)",
+        title: 'Aging p90 (d)',
         value: personal.aging_p90_days,
       },
     ];
@@ -173,9 +173,9 @@ export default function Dashboard() {
   const capacityStats = useMemo(() => {
     const personal = data?.personal?.capacity || {};
     return [
-      { title: "Hours Today", value: personal.hours_logged_today },
-      { title: "Target", value: personal.target_hours_today },
-      { title: "Suggestions", value: personal.suggested_logs },
+      { title: 'Hours Today', value: personal.hours_logged_today },
+      { title: 'Target', value: personal.target_hours_today },
+      { title: 'Suggestions', value: personal.suggested_logs },
     ];
   }, [data]);
 
@@ -183,9 +183,7 @@ export default function Dashboard() {
     <div className="max-w-7xl mx-auto px-4 py-8">
       <header className="mb-8 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-50 mb-1">
-            Jira Dashboard
-          </h1>
+          <h1 className="text-3xl font-bold text-slate-50 mb-1">Summary</h1>
           <p className="text-slate-400">Overview of your Jira activity</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -194,7 +192,7 @@ export default function Dashboard() {
             className="px-3 py-2 text-sm rounded bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 transition-colors"
             disabled={loading}
           >
-            {loading ? "Loading..." : "Refresh"}
+            {loading ? 'Loading...' : 'Refresh'}
           </button>
           {lastFetched && (
             <span className="text-[11px] text-slate-500">
@@ -320,17 +318,17 @@ export default function Dashboard() {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                      legend: { display: true, labels: { color: "#94a3b8" } },
+                      legend: { display: true, labels: { color: '#94a3b8' } },
                     },
                     scales: {
                       x: {
-                        ticks: { color: "#94a3b8" },
+                        ticks: { color: '#94a3b8' },
                         grid: { display: false },
                       },
                       y: {
                         beginAtZero: true,
-                        ticks: { color: "#94a3b8" },
-                        grid: { color: "rgba(59,130,246,0.1)" },
+                        ticks: { color: '#94a3b8' },
+                        grid: { color: 'rgba(59,130,246,0.1)' },
                       },
                     },
                   }}
@@ -345,12 +343,12 @@ export default function Dashboard() {
                   options={{
                     responsive: true,
                     maintainAspectRatio: false,
-                    cutout: "70%",
+                    cutout: '70%',
                     plugins: {
                       legend: {
-                        position: "bottom",
+                        position: 'bottom',
                         labels: {
-                          color: "#94a3b8",
+                          color: '#94a3b8',
                           boxWidth: 14,
                           font: { size: 12 },
                         },
@@ -370,16 +368,16 @@ export default function Dashboard() {
                   options={{
                     responsive: true,
                     maintainAspectRatio: false,
-                    indexAxis: "y",
+                    indexAxis: 'y',
                     plugins: { legend: { display: false } },
                     scales: {
                       x: {
                         beginAtZero: true,
-                        ticks: { color: "#94a3b8" },
-                        grid: { color: "rgba(59,130,246,0.1)" },
+                        ticks: { color: '#94a3b8' },
+                        grid: { color: 'rgba(59,130,246,0.1)' },
                       },
                       y: {
-                        ticks: { color: "#94a3b8" },
+                        ticks: { color: '#94a3b8' },
                         grid: { display: false },
                       },
                     },
@@ -397,8 +395,8 @@ export default function Dashboard() {
                     maintainAspectRatio: false,
                     plugins: {
                       legend: {
-                        position: "bottom",
-                        labels: { color: "#94a3b8" },
+                        position: 'bottom',
+                        labels: { color: '#94a3b8' },
                       },
                     },
                   }}
@@ -438,11 +436,11 @@ export default function Dashboard() {
                     <div className="flex flex-wrap items-center gap-2 text-xs">
                       <span
                         className={`px-2 py-1 rounded-full border ${
-                          t.priority === "High" || t.priority === "Highest"
-                            ? "bg-red-500/10 text-red-300 border-red-500/30"
-                            : t.priority === "Medium"
-                            ? "bg-yellow-500/10 text-yellow-300 border-yellow-500/30"
-                            : "bg-green-500/10 text-green-300 border-green-500/30"
+                          t.priority === 'High' || t.priority === 'Highest'
+                            ? 'bg-red-500/10 text-red-300 border-red-500/30'
+                            : t.priority === 'Medium'
+                            ? 'bg-yellow-500/10 text-yellow-300 border-yellow-500/30'
+                            : 'bg-green-500/10 text-green-300 border-green-500/30'
                         }`}
                       >
                         {t.priority}
@@ -484,10 +482,10 @@ export default function Dashboard() {
                   value={`${data.trends.growth_rate}%`}
                   className={
                     data.trends.growth_rate > 0
-                      ? "border-green-500/20"
+                      ? 'border-green-500/20'
                       : data.trends.growth_rate < 0
-                      ? "border-red-500/20"
-                      : ""
+                      ? 'border-red-500/20'
+                      : ''
                   }
                 />
               </div>
