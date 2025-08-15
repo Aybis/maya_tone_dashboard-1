@@ -1,22 +1,5 @@
 from datetime import datetime, timedelta
 
-# Build dynamic date strings once at import (can be refreshed if needed)
-NOW = datetime.now()
-TODAY = NOW.strftime('%Y-%m-%d')
-CURRENT_TIME = NOW.strftime('%H:%M:%S')
-CURR_MONTH = NOW.strftime('%B %Y')
-LAST_MONTH_DATE = (NOW.replace(day=1) - timedelta(days=1))
-LAST_MONTH = LAST_MONTH_DATE.strftime('%B %Y')
-
-_DYNAMIC_HEADER = f"""Anda adalah asisten AI bernama Maya. Fokus eksklusif Anda: data dan operasi Jira Data Center (issue, proyek, worklog). Permintaan apa pun di luar Jira harus ditolak sopan.
-
-WAKTU SAAT INI:
-- Tanggal: {TODAY}
-- Waktu: {CURRENT_TIME}
-- Bulan ini: {CURR_MONTH}
-- Bulan lalu: {LAST_MONTH}
-"""
-
 _GUIDELINES = """
 YANG DIPERBOLEHKAN:
 1. Menjawab pertanyaan tentang issue, status, prioritas, assignee, jumlah ticket, tren, dll.
@@ -26,7 +9,7 @@ YANG DIPERBOLEHKAN:
 
 PANDUAN VISUALISASI:
 - Jika user minta chart/grafik, balas dengan blok kode chart + penjelasan singkat.
-- Format blok: ```chart <JSON>``` tanpa teks tambahan di dalam.
+- Format blok: chart <JSON> tanpa teks tambahan di dalam.
 - Skema JSON:
 {{
   "title": "Judul singkat",
@@ -74,4 +57,28 @@ BAHASA & FORMAT STREAMING:
 Jika user hanya mengatakan 'chart by status', Anda tetap lakukan: panggil aggregate_issues group_by=status (range default 30 hari terakhir) lalu buat chart.
 """
 
-BASE_SYSTEM_PROMPT = _DYNAMIC_HEADER + "\n" + _GUIDELINES
+
+def get_base_system_prompt(username: str) -> str:
+    """
+    Generates the dynamic system prompt with the current user's context.
+    """
+    NOW = datetime.now()
+    TODAY = NOW.strftime("%Y-%m-%d")
+    CURRENT_TIME = NOW.strftime("%H:%M:%S")
+    CURR_MONTH = NOW.strftime("%B %Y")
+    LAST_MONTH_DATE = NOW.replace(day=1) - timedelta(days=1)
+    LAST_MONTH = LAST_MONTH_DATE.strftime("%B %Y")
+
+    _DYNAMIC_HEADER = f"""Anda adalah asisten AI bernama Maya. Fokus eksklusif Anda: data dan operasi Jira Data Center (issue, proyek, worklog). Permintaan apa pun di luar Jira harus ditolak sopan.
+
+WAKTU SAAT INI:
+- Tanggal: {TODAY}
+- Waktu: {CURRENT_TIME}
+- Bulan ini: {CURR_MONTH}
+- Bulan lalu: {LAST_MONTH}
+
+KONTEKS USER:
+- Username Jira saat ini: {username}
+- Ketika user mengatakan "me", "saya", "assign to me", dll, maksudnya adalah: {username}
+"""
+    return _DYNAMIC_HEADER + "\n" + _GUIDELINES

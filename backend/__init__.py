@@ -17,6 +17,7 @@ from .api.chart import chart_bp
 from .api.auth import auth_bp
 import requests
 
+
 def create_app():
     """Application factory.
 
@@ -37,25 +38,27 @@ def create_app():
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(chart_bp)
     app.register_blueprint(auth_bp)
-    
+
     @app.before_request
     def require_auth():
-        exempt_paths = ['/api/login', '/api/logout', '/api/health', '/api/check-auth']
-        if request.path in exempt_paths or request.path.startswith('/static'):
+        exempt_paths = ["/api/login", "/api/logout", "/api/health", "/api/check-auth"]
+        if request.path in exempt_paths or request.path.startswith("/static"):
             return
-        
-        if request.path.startswith('/api/') and not session.get('logged_in'):
-            return jsonify({'error': 'Authentication required'}), 401
 
-    @app.route('/api/health')
+        if request.path.startswith("/api/") and not session.get("logged_in"):
+            return jsonify({"error": "Authentication required"}), 401
+
+    @app.route("/api/health")
     def health():
         from datetime import datetime
-        return jsonify({'status':'healthy','timestamp': datetime.now().isoformat()})
+
+        return jsonify({"status": "healthy", "timestamp": datetime.now().isoformat()})
 
     return app
 
+
 # Socket.IO event handlers (placed after app creation so 'socketio' is bound)
-@socketio.on('join_chat')
+@socketio.on("join_chat")
 def handle_join_chat(data):
     """Client requests to join a chat room to receive real-time messages.
 
@@ -64,10 +67,12 @@ def handle_join_chat(data):
     """
     try:
         from flask import request as flask_request
-        chat_id = (data or {}).get('chat_id')
+
+        chat_id = (data or {}).get("chat_id")
         if not chat_id:
             return
         from flask_socketio import join_room
+
         join_room(chat_id)
     except Exception:
         # Best-effort; avoid crashing on bad payload

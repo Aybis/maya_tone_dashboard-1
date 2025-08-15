@@ -6,6 +6,7 @@ from flask_cors import CORS
 # CORS: allow frontend dev server calls without manual headers.
 socketio = SocketIO(cors_allowed_origins="*")
 
+
 def init_extensions(app):
     """Bind global extension objects to the Flask app instance."""
     CORS(app)

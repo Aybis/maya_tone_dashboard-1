@@ -4,6 +4,7 @@ Purpose: Provide a single execute() surface so the chat layer only needs the
 function name + JSON args (mirrors the OpenAI tool call contract) without
 embedding Jira specifics in the conversation layer.
 """
+
 from typing import Dict, Tuple, Any
 from ..jira_utils import aggregate_issues, JiraManager
 from . import jira_crud
@@ -11,12 +12,14 @@ from ..config import JIRA_BASE_URL, JIRA_USERNAME, JIRA_PASSWORD
 
 _jira_manager = None
 
+
 def jira_manager():
     """Lazy singleton JiraManager."""
     global _jira_manager
     if _jira_manager is None:
         _jira_manager = JiraManager(JIRA_BASE_URL, JIRA_USERNAME, JIRA_PASSWORD)
     return _jira_manager
+
 
 def execute(function_name: str, args: Dict) -> Tuple[Any, str]:
     """Execute a tool function by name.
@@ -27,32 +30,40 @@ def execute(function_name: str, args: Dict) -> Tuple[Any, str]:
     """
     try:
         # Dispatch mapping from function name to CRUD or aggregation operation
-        if function_name == 'get_issues':
+        if function_name == "get_issues":
             return jira_crud.execute_jql_search(**args)
-        if function_name == 'get_projects':
+        if function_name == "get_projects":
             return jira_crud.get_all_projects()
-        if function_name == 'get_issue_types':
+        if function_name == "get_issue_types":
             return jira_crud.get_issue_types(**args)
-        if function_name == 'get_worklogs':
+        if function_name == "get_worklogs":
             from ..utils.session_jira import get_session_credentials
+
             _, session_username, _ = get_session_credentials()
-            args['username'] = session_username or args.get('username', 'unknown')
+            args["username"] = session_username or args.get("username", "unknown")
             return jira_crud.get_worklogs(**args)
-        if function_name == 'create_worklog':
+        if function_name == "create_worklog":
             return jira_crud.create_worklog(**args)
-        if function_name == 'update_worklog':
+        if function_name == "update_worklog":
             return jira_crud.update_worklog(**args)
-        if function_name == 'delete_worklog':
+        if function_name == "delete_worklog":
             return jira_crud.delete_worklog(**args)
-        if function_name == 'manage_issue':
-            action = args.get('action'); details = args.get('details', {})
+        if function_name == "manage_issue":
+            action = args.get("action")
+            details = args.get("details", {})
             # Manage issue can create, update, or delete based on action
-            if action == 'create': return jira_crud.create_issue(details)
-            if action == 'update':
-                issue_key = details.pop('issue_key', None)
+            if action == "create":
+                return jira_crud.create_issue(details)
+            if action == "update":
+                issue_key = details.pop("issue_key", None)
                 return jira_crud.update_issue(issue_key, details)
-            if action == 'delete': return jira_crud.delete_issue(details.get('issue_key',))
-        if function_name == 'aggregate_issues':
+            if action == "delete":
+                return jira_crud.delete_issue(
+                    details.get(
+                        "issue_key",
+                    )
+                )
+        if function_name == "aggregate_issues":
             return aggregate_issues(jira_manager(), **args)
         return None, f"Fungsi '{function_name}' tidak ditemukan."
     except Exception as e:
