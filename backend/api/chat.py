@@ -22,6 +22,50 @@ from ..extensions import socketio  # For real-time emission of assistant replies
 chat_bp = Blueprint("chat", __name__)
 
 
+def detect_chart_type(user_message: str, group_by: str = None, data_counts: list = None) -> str:
+    """
+    Detect the appropriate chart type based on user message and data characteristics.
+    
+    Args:
+        user_message: The user's message requesting a chart
+        group_by: The field being grouped by (status, priority, etc.)
+        data_counts: List of count data to analyze
+    
+    Returns:
+        Chart type string: "pie", "doughnut", "bar", "bar-horizontal", or "line"
+    """
+    message_lower = user_message.lower()
+    
+    # Explicit chart type requests
+    if any(word in message_lower for word in ["pie chart", "pie", "circular"]):
+        return "pie"
+    if any(word in message_lower for word in ["doughnut", "donut", "ring"]):
+        return "doughnut"
+    if any(word in message_lower for word in ["line chart", "line", "trend", "over time"]):
+        return "line"
+    if any(word in message_lower for word in ["horizontal bar", "horizontal"]):
+        return "bar-horizontal"
+    if any(word in message_lower for word in ["bar chart", "bar", "column"]):
+        return "bar"
+    
+    # Smart defaults based on data characteristics
+    if group_by == "created_date" or "time" in message_lower or "trend" in message_lower:
+        return "line"
+    
+    # For categorical data with few items, pie/doughnut works well
+    if data_counts and len(data_counts) <= 6:
+        # If user mentions distribution, proportion, or percentage, prefer pie
+        if any(word in message_lower for word in ["distribution", "proportion", "percentage", "share", "breakdown"]):
+            return "pie"
+    
+    # For many categories or when comparing values, bar is better
+    if data_counts and len(data_counts) > 10:
+        return "bar"
+    
+    # Default fallback
+    return "bar"
+
+
 def get_model_name():
     """Return the Azure OpenAI deployment name."""
     return AZURE_OPENAI_DEPLOYMENT_NAME
@@ -58,9 +102,13 @@ def build_tools(current_date: str, month_start: str):
                             "type": "string",
                             "description": "YYYY-MM-DD akhir (opsional)",
                         },
-                        "max_results": {
+                        "max_groups": {
                             "type": "integer",
-                            "description": "Batasi jumlah grup dalam chart (contoh: 5 untuk top 5). Sisanya akan digabung ke 'Others'",
+                            "description": "Batasi jumlah grup dalam chart (contoh: 5 untuk top 5 assignees). Sisanya akan digabung ke 'Others'",
+                        },
+                        "max_issues": {
+                            "type": "integer", 
+                            "description": "Batasi jumlah issue yang diambil dari Jira API (default 500, tingkatkan jika perlu data lebih lengkap)",
                         },
                         "jql_extra": {
                             "type": "string",
@@ -397,15 +445,16 @@ def ask(chat_id):
             labels = [c["label"] for c in counts][:40]
             values = [c["value"] for c in counts][:40]
             total = sum(values) or 1
+            chart_type = detect_chart_type(user_message, "status", counts)
             chart = {
                 "title": "Distribusi Issue (Fallback)",
-                "type": "bar",
+                "type": chart_type,
                 "labels": labels,
                 "datasets": [
                     {
                         "label": "Jumlah",
                         "data": values,
-                        "backgroundColor": ["#3b82f6"] * len(values),
+                        "backgroundColor": ["#3b82f6", "#06b6d4", "#8b5cf6", "#f59e0b", "#ef4444"] * (len(values) // 5 + 1),
                     }
                 ],
                 "meta": {"group_by": "status", "filters": {}, "counts": counts},
@@ -442,9 +491,10 @@ def ask(chat_id):
         labels = [c["label"] for c in data_res["counts"]][:40]
         values = [c["value"] for c in data_res["counts"]][:40]
         total = sum(values) or 1
+        chart_type = detect_chart_type(user_message, data_res["group_by"], data_res["counts"])
         chart = {
             "title": f"Agg by {data_res['group_by']}",
-            "type": "bar",
+            "type": chart_type,
             "labels": labels,
             "datasets": [
                 {
@@ -581,9 +631,10 @@ def ask_stream(chat_id):
                 labels = [c["label"] for c in data_res["counts"]][:40]
                 values = [c["value"] for c in data_res["counts"]][:40]
                 total = sum(values) or 1
+                chart_type = detect_chart_type(user_message, data_res["group_by"], data_res["counts"])
                 chart = {
                     "title": f"Agg by {data_res['group_by']}",
-                    "type": "bar",
+                    "type": chart_type,
                     "labels": labels,
                     "datasets": [
                         {
@@ -849,9 +900,10 @@ def ask_new():
                 labels = [c["label"] for c in data_res["counts"]][:40]
                 values = [c["value"] for c in data_res["counts"]][:40]
                 total = sum(values) or 1
+                chart_type = detect_chart_type(user_message, data_res["group_by"], data_res["counts"])
                 chart = {
                     "title": f"Agg by {data_res['group_by']}",
-                    "type": "bar",
+                    "type": chart_type,
                     "labels": labels,
                     "datasets": [
                         {

@@ -320,8 +320,24 @@ def aggregate_issues(
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,
     jql_extra: Optional[str] = None,
-    max_results: int = 500,  # This limits Jira API results, not chart groups
+    max_issues: int = 500,  # Limits Jira API results
+    max_groups: Optional[int] = None,  # Limits number of groups in result
 ) -> Tuple[Optional[dict], Optional[str]]:
+    """
+    Aggregate Jira issues by specified grouping.
+    
+    Args:
+        jira_manager: JiraManager instance
+        group_by: Field to group by ("status", "priority", "assignee", "type", "created_date")
+        from_date: Start date filter (YYYY-MM-DD)
+        to_date: End date filter (YYYY-MM-DD)
+        jql_extra: Additional JQL clauses
+        max_issues: Maximum number of issues to fetch from Jira API
+        max_groups: Maximum number of groups to return in chart
+    
+    Returns:
+        Tuple of (aggregation_data, error_message)
+    """
     if jira_manager is None:
         return None, "Jira manager belum terinisialisasi."
     
@@ -340,10 +356,10 @@ def aggregate_issues(
     
     jql = " AND ".join(clauses) if clauses else f"{date_field} >= -30d"
     
-    issues = jira_manager.search_issues(jql, max_results)
+    issues = jira_manager.search_issues(jql, max_issues)
     counter = _Counter()
     
-    # Collect distinct values
+    # Collect distinct values for filter options
     distinct_status = set()
     distinct_assignee = set()
     distinct_project = set()
@@ -369,7 +385,7 @@ def aggregate_issues(
         
         counter[key] += 1
         
-        # Collect distincts for filters
+        # Collect distinct values for filter options
         distinct_status.add((f.get("status") or {}).get("name", "Unknown"))
         distinct_priority.add((f.get("priority") or {}).get("name", "Medium"))
         distinct_assignee.add((f.get("assignee") or {}).get("displayName", "Unassigned"))
@@ -378,19 +394,36 @@ def aggregate_issues(
         if proj:
             distinct_project.add(proj)
     
-    # Sort the data appropriately
+    # Sort the aggregated data appropriately
     if group_by == "created_date":
         # For dates, sort chronologically (ascending by date)
-        data = [
+        counts_data = [
             {"label": k, "value": v}
             for k, v in sorted(counter.items(), key=lambda x: x[0])  # Sort by date string
         ]
     else:
         # For all other groupings, sort by count (descending) then by label
-        data = [
+        counts_data = [
             {"label": k, "value": v}
             for k, v in sorted(counter.items(), key=lambda x: (-x[1], x[0]))  # Sort by count desc, then label asc
         ]
+    
+    # Apply max_groups limit if specified
+    limited_data = counts_data
+    others_count = 0
+    
+    if max_groups and isinstance(max_groups, int) and max_groups > 0 and len(counts_data) > max_groups:
+        if group_by == "created_date":
+            # For date grouping, keep chronological order and limit
+            limited_data = counts_data[:max_groups]
+        else:
+            # For other groupings, take top N by value (data is already sorted by value desc)
+            limited_data = counts_data[:max_groups]
+            # Calculate "Others" category for remaining items
+            others_items = counts_data[max_groups:]
+            others_count = sum(item["value"] for item in others_items)
+            if others_count > 0:
+                limited_data.append({"label": "Others", "value": others_count})
     
     return (
         {
@@ -398,7 +431,9 @@ def aggregate_issues(
             "from": from_date,
             "to": to_date,
             "total": sum(counter.values()),
-            "counts": data,  # This is now properly sorted
+            "counts": limited_data,  # Now properly limited based on max_groups
+            "total_groups": len(counts_data),  # Original number of groups  
+            "showing_groups": len(counts_data),  # Showing number of groups
             "jql": jql,
             "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "distincts": {
