@@ -5,4 +5,4 @@ python-dotenv
 openai
 flask-socketio
 jira
- 
+numpy
