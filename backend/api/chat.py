@@ -226,7 +226,7 @@ def build_tools(current_date: str, month_start: str):
             "type": "function",
             "function": {
                 "name": "manage_issue",
-                "description": "Create / update / delete issue. Gunakan action=create|update|delete. Untuk create/update sertakan fields di details.",
+                "description": "Create / update issue. Gunakan action=create|update. Untuk create/update sertakan fields di details. Tidak ada delete issue.",
                 "parameters": {
                     "type": "object",
                     "properties": {
