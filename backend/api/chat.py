@@ -243,16 +243,41 @@ def build_tools(current_date: str, month_start: str):
                                 "summary": {"type": "string"},
                                 "description": {"type": "string"},
                                 "acceptance_criteria": {"type": "string"},
-                                "priority_name": {"type": "string"},
+                                "priority_name": {"type": "string", "default": "P2"},
                                 "assignee_name": {"type": "string"},
                                 "duedate": {"type": "string"},
-                                "issuetype_name": {"type": "string"},
+                                "issuetype_name": {"type": "string", "defaulr": "Bug"},
                             },
                         },
                     },
                     "required": ["action"],
                 },
             },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "search_users",
+                "description": "Search for users by name (fuzzy search). Use this when user mentions a name for assignment but you need to find the exact user. If project is provided, searches for assignable users in that project, otherwise searches all users.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "partial_name": {
+                            "type": "string",
+                            "description": "Partial name or username to search for"
+                        },
+                        "project": {
+                            "type": "string",
+                            "description": "Optional project name to check user assignability in that specific project"
+                        },
+                        "max_results": {
+                            "type": "integer",
+                            "description": "Maximum number of results to return (default 10)"
+                        }
+                    },
+                    "required": ["partial_name"]
+                }
+            }
         },
     ]
 

@@ -115,6 +115,34 @@ When the AI returns a chart it uses a fenced block:
 ````
 The frontend can parse these blocks to render charts directly.
 
+### Smart User Assignment Workflow
+
+The AI now intelligently handles user assignment with fuzzy search:
+
+**Example Conversation:**
+```
+User: "Can you create a ticket for project ABC and assign it to John?"
+
+AI: "I found these users matching 'John':
+- John Smith (john.smith@company.com)
+- John Doe (john.doe@company.com) 
+- John Wilson (j.wilson@company.com)
+
+Which John did you mean?"
+
+User: "John Smith"
+
+AI: "Perfect! I'll create the ticket and assign it to John Smith. Please confirm..."
+```
+
+**How it works:**
+1. AI detects name mention in assignment context
+2. Calls `search_users` tool with fuzzy matching
+3. If exact match found → proceeds
+4. If multiple matches → presents options to user
+5. Waits for user clarification before proceeding
+6. Uses confirmed exact username for assignment
+
 ## Frontend Notes
 
 **Authentication Flow:**
@@ -186,7 +214,14 @@ Add socket events:
 
 ## Recent Updates
 
-**Authentication & Security (Latest):**
+**Smart User Assignment (Latest):**
+- ✅ Fuzzy user search for ticket assignment
+- ✅ AI automatically searches for users when names are mentioned
+- ✅ Intelligent matching with exact and partial name support
+- ✅ User confirmation workflow for ambiguous names
+- ✅ Example: "assign to John" → AI finds John Smith, John Doe, etc. and asks for clarification
+
+**Authentication & Security:**
 - ✅ Real-time Jira credential validation using `/rest/api/2/myself` endpoint
 - ✅ Enhanced login UI with modern gradient design and animations
 - ✅ Password visibility toggle for better UX

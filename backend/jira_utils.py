@@ -5,6 +5,7 @@ import requests
 from typing import List, Dict, Any, Optional
 from .utils.session_jira import get_session_credentials
 import numpy as np
+import difflib
 
 
 class JiraManager:
@@ -31,6 +32,112 @@ class JiraManager:
             return r.json()
         except Exception:
             return {}
+
+    def search_users(self, query: str, project: str = None, max_results: int = 50) -> List[Dict[str, Any]]:
+        """Search for users in JIRA using either assignable search (if project provided) or basic user search"""
+        try:
+            if project:
+                # Use assignable search when project is specified
+                params = {
+                    "username": query,
+                    "project": project,
+                    "maxResults": max_results
+                }
+                r = self.session.get(f"{self.base_url}/rest/api/2/user/assignable/search", params=params)
+            else:
+                # Use basic user search when no project is specified
+                params = {
+                    "username": query,
+                    "maxResults": max_results
+                }
+                r = self.session.get(f"{self.base_url}/rest/api/2/user/search", params=params)
+            
+            r.raise_for_status()
+            users = r.json()
+            
+            # Format the response to include relevant user info
+            formatted_users = []
+            for user in users:
+                formatted_users.append({
+                    "name": user.get("name", ""),
+                    "displayName": user.get("displayName", ""),
+                    "emailAddress": user.get("emailAddress", ""),
+                    "active": user.get("active", True)
+                })
+            return formatted_users
+        except Exception:
+            return []
+
+    def fuzzy_search_users(self, partial_name: str, project: str = None, max_results: int = 10) -> List[Dict[str, Any]]:
+        """
+        Perform fuzzy search for users by name.
+        First tries exact search, then falls back to fuzzy matching.
+        If project is provided, searches for assignable users in that project.
+        If project is None, searches all users.
+        """
+        if not partial_name or not partial_name.strip():
+            return []
+        
+        partial_name = partial_name.strip()
+        
+        # First try exact search with the partial name
+        users = self.search_users(partial_name, project, max_results * 2)
+        
+        if not users:
+            return []
+        
+        # Filter active users only
+        active_users = [u for u in users if u.get("active", True)]
+        
+        # Check for exact matches first (case insensitive)
+        exact_matches = []
+        fuzzy_candidates = []
+        
+        for user in active_users:
+            display_name = user.get("displayName", "").lower()
+            name = user.get("name", "").lower()
+            partial_lower = partial_name.lower()
+            
+            # Check for exact matches in display name or username
+            if (partial_lower == display_name or 
+                partial_lower == name or
+                partial_lower in display_name.split() or
+                partial_lower in name.split()):
+                exact_matches.append(user)
+            else:
+                fuzzy_candidates.append(user)
+        
+        # If we have exact matches, return them first
+        if exact_matches:
+            return exact_matches[:max_results]
+        
+        # Otherwise, do fuzzy matching on display names
+        fuzzy_matches = []
+        for user in fuzzy_candidates:
+            display_name = user.get("displayName", "")
+            name = user.get("name", "")
+            
+            # Calculate similarity scores
+            display_ratio = difflib.SequenceMatcher(None, partial_name.lower(), display_name.lower()).ratio()
+            name_ratio = difflib.SequenceMatcher(None, partial_name.lower(), name.lower()).ratio()
+            
+            # Also check if partial name is contained in display name or name
+            contains_score = 0
+            if partial_name.lower() in display_name.lower():
+                contains_score = 0.8
+            elif partial_name.lower() in name.lower():
+                contains_score = 0.7
+            
+            # Use the best score
+            best_score = max(display_ratio, name_ratio, contains_score)
+            
+            if best_score > 0.4:  # Threshold for fuzzy matching
+                fuzzy_matches.append((user, best_score))
+        
+        # Sort by similarity score (descending)
+        fuzzy_matches.sort(key=lambda x: x[1], reverse=True)
+        
+        return [match[0] for match in fuzzy_matches[:max_results]]
 
     def search_issues(self, jql: str, max_results: int = 50) -> List[Dict[str, Any]]:
         try:

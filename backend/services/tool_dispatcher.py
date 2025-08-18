@@ -65,6 +65,12 @@ def execute(function_name: str, args: Dict) -> Tuple[Any, str]:
                 )
         if function_name == "aggregate_issues":
             return aggregate_issues(jira_manager(), **args)
+        if function_name == "search_users":
+            partial_name = args.get("partial_name", "")
+            max_results = args.get("max_results", 50)
+            project = args.get("project")  # Can be None
+            users = jira_manager().fuzzy_search_users(partial_name, project, max_results)
+            return users, None
         return None, f"Fungsi '{function_name}' tidak ditemukan."
     except Exception as e:
         # Handle and log the exception, returning an error message
