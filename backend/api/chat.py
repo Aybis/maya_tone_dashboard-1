@@ -232,7 +232,7 @@ def build_tools(current_date: str, month_start: str):
                     "properties": {
                         "action": {
                             "type": "string",
-                            "enum": ["create", "update", "delete"],
+                            "enum": ["create", "update"], #delete disabled
                         },
                         "details": {
                             "type": "object",

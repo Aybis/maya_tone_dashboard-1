@@ -43,6 +43,9 @@ def execute_jql_search(jql_query: str, max_results: int = 50):
                         "priority": {"name": f.priority.name if f.priority else None},
                         "created": f.created,
                         "updated": f.updated,
+                        "dueDate": f.duedate,
+                        "assignee": f.assignee,
+                        "reporter": f.reporter,
                     },
                 }
             )
@@ -56,7 +59,30 @@ def get_all_projects():
     if not client:
         return None, "Jira client tidak tersedia"
     try:
-        return [{"key": p.key, "name": p.name} for p in client.projects()], None
+        # Get current user
+        current_user = client.current_user()
+        username = current_user if isinstance(current_user, str) else current_user.name
+        
+        # Search for open issues where the current user is involved (assignee, reporter, or has worked on)
+        jql = f"(assignee = '{username}' OR reporter = '{username}' OR worklogAuthor = '{username}') AND resolution = Unresolved"
+        issues = client.search_issues(jql, maxResults=1000, fields="project")
+        
+        # Extract unique projects from the issues
+        project_keys = set()
+        for issue in issues:
+            project_keys.add(issue.fields.project.key)
+        
+        # Get project details for the projects the user has issues in
+        user_projects = []
+        for project_key in project_keys:
+            try:
+                project = client.project(project_key)
+                user_projects.append({"key": project.key, "name": project.name})
+            except Exception:
+                # Skip projects that can't be accessed
+                continue
+        
+        return user_projects, None
     except Exception as e:
         return None, f"Error mengambil projek: {e}"
 
