@@ -44,7 +44,7 @@ def execute_jql_search(jql_query: str, max_results: int = 50):
                         "created": f.created,
                         "updated": f.updated,
                         "dueDate": f.duedate,
-                         "reporter": {"displayName": f.reporter.displayName},
+                        "reporter": {"displayName": f.reporter.displayName},
                         "issuetype": {"name": f.issuetype.name}
                     },
                 }
