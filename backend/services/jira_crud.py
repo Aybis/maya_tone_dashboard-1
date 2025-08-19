@@ -253,7 +253,6 @@ def delete_issue(issue_key):
     except Exception as e:
         return False, f"Gagal hapus issue: {e}"
 
-
 def export_worklog_data(start_date: str, end_date: str, username: str, full_name: str):
     """Export worklog data in the specified table format for date range."""
     client = jira_client()
@@ -268,7 +267,7 @@ def export_worklog_data(start_date: str, end_date: str, username: str, full_name
         # Validate date range
         if start_dt > end_dt:
             return {
-                "table": "| No | Issue Key | Issue Summary | Hours | MD | Work Date | Username | Full Name | Project Name | Activities Type |\n|---|---|---|---|---|---|---|---|---|---|\n| 1 |  | Invalid date range | 0 | 1 MD | " + start_date + " | " + username + " | " + full_name + " |  |  |"
+                "table": "| No | Issue Key | Issue Summary | Hours | MD | Work Date | Username | Full Name | Project Name | Activities Type |\n|---|---|---|---|---|---|---|---|---|---|\n| 1 |  | Invalid date range | 0 | 1 | " + start_date + " | " + username + " | " + full_name + " |  |  |"
             }, None
         
         # Get all worklogs for the user in the date range
@@ -287,9 +286,6 @@ def export_worklog_data(start_date: str, end_date: str, username: str, full_name
                     project_cache[project_key] = issue.fields.project.name
                 project_name = project_cache[project_key]
                 
-                # Get issue type
-                issue_type = issue.fields.issuetype.name if issue.fields.issuetype else ""
-                
                 # Get worklogs for this issue
                 for worklog in client.worklogs(issue.key):
                     started = getattr(worklog, "started", "")
@@ -306,13 +302,20 @@ def export_worklog_data(start_date: str, end_date: str, username: str, full_name
                             # Get worklog description (not issue summary)
                             description = getattr(worklog, "comment", "") or "—"
                             
+                            # Get activity type from worklog (default to "Development" if not available)
+                            activity_type = getattr(worklog, "activityType", None)
+                            if activity_type:
+                                activity_type = getattr(activity_type, "name", "Development")
+                            else:
+                                activity_type = "Development"
+                            
                             worklog_data.append({
                                 "issue_key": issue.key,
                                 "description": description,
                                 "hours": hours,
                                 "work_date": started[:10],
                                 "project_name": project_name,
-                                "issue_type": issue_type,
+                                "activity_type": activity_type,
                                 "created": getattr(worklog, "created", started)
                             })
             except Exception:
@@ -336,12 +339,19 @@ def export_worklog_data(start_date: str, end_date: str, username: str, full_name
             day_worklogs = [w for w in worklog_data if w["work_date"] == date_str]
             
             if day_worklogs:
-                # Sort by issue key, then by created time
-                day_worklogs.sort(key=lambda x: (x["issue_key"], x["created"]))
-                
-                for worklog in day_worklogs:
+                # Create separate rows for each worklog, but repeat day info for visual "merged" effect
+                for i, worklog in enumerate(day_worklogs):
+                    # Show day number only for the first worklog, but repeat other day info for all
+                    row_day_no = day_no if i == 0 else ""
+                    row_md = "1"
+                    row_work_date = date_str
+                    row_username = username
+                    row_full_name = full_name
+                    row_project_name = worklog['project_name']
+                    row_activity_type = worklog['activity_type']
+                    
                     table_rows.append(
-                        f"| {day_no} | {worklog['issue_key']} | {worklog['description']} | {worklog['hours']} | 1 MD | {date_str} | {username} | {full_name} | {worklog['project_name']} | {worklog['issue_type']} |"
+                        f"| {row_day_no} | {worklog['issue_key']} | {worklog['description']} | {worklog['hours']} | {row_md} | {row_work_date} | {row_username} | {row_full_name} | {row_project_name} | {row_activity_type} |"
                     )
             else:
                 # No worklogs for this day - show issue title according to issue key
@@ -354,7 +364,7 @@ def export_worklog_data(start_date: str, end_date: str, username: str, full_name
                     issue_title = ""
                 
                 table_rows.append(
-                    f"| {day_no} | {issue_key} | {issue_title} | 0 | 1 MD | {date_str} | {username} | {full_name} |  |  |"
+                    f"| {day_no} | {issue_key} | {issue_title} | 0 | 1 | {date_str} | {username} | {full_name} |  |  |"
                 )
             
             current_date += timedelta(days=1)

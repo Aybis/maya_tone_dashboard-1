@@ -72,15 +72,27 @@ def execute(function_name: str, args: Dict) -> Tuple[Any, str]:
             users = jira_manager().fuzzy_search_users(partial_name, project, max_results)
             return users, None
         if function_name == "export_worklog_data":
+            from datetime import datetime, timedelta
             from ..utils.session_jira import get_session_credentials
             from flask import session
             
             _, session_username, _ = get_session_credentials()
             full_name = session.get("jira_display_name", session_username or "Unknown User")
             
+            # Default to last 30 days if dates not provided
+            end_date = args.get("end_date")
+            start_date = args.get("start_date")
+            
+            if not end_date:
+                end_date = datetime.now().strftime("%Y-%m-%d")
+            
+            if not start_date:
+                start_datetime = datetime.now() - timedelta(days=30)
+                start_date = start_datetime.strftime("%Y-%m-%d")
+            
             return jira_crud.export_worklog_data(
-                start_date=args.get("start_date"),
-                end_date=args.get("end_date"),
+                start_date=start_date,
+                end_date=end_date,
                 username=session_username or "unknown",
                 full_name=full_name
             )
