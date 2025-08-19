@@ -1,12 +1,12 @@
-import RenderIf from '@/components/atoms/RenderIf';
-import FooterSidebar from '@/components/templates/FooterSidebar';
-import MenuHistoryChat from '@/components/templates/MenuHistoryChat';
-import MenuItem from '@/components/templates/MenuItem';
-import { ChevronLeftIcon, PlusIcon } from '@heroicons/react/24/solid';
-import { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import ModalLogout from '../components/templates/ModalLogout';
-import { useChatContext } from '../context/ChatContext';
+import RenderIf from "@/components/atoms/RenderIf";
+import FooterSidebar from "@/components/templates/FooterSidebar";
+import MenuHistoryChat from "@/components/templates/MenuHistoryChat";
+import MenuItem from "@/components/templates/MenuItem";
+import { ChevronLeftIcon, PlusIcon } from "@heroicons/react/24/solid";
+import { useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import ModalLogout from "../components/templates/ModalLogout";
+import { useChatContext } from "../context/ChatContext";
 
 const Sidebar = ({ username, onLogout }) => {
   const { chats, createNewChat, deleteChat, renameChat, loadingChats } =
@@ -36,16 +36,16 @@ const Sidebar = ({ username, onLogout }) => {
     <>
       <aside
         className={[
-          showSidebar ? 'w-64' : 'w-12',
-          ' bg-[#0f0f23]/90 transition-all duration-500 backdrop-blur border-r border-blue-500/10 flex flex-col h-screen sticky top-0',
-        ].join(' ')}
+          showSidebar ? "w-64" : "w-12",
+          " bg-[#0f0f23]/90 transition-all duration-500 backdrop-blur border-r border-blue-500/10 flex flex-col h-screen sticky top-0",
+        ].join(" ")}
       >
         <div className="p-4 border-b border-blue-500/10 relative">
           <div
             className={[
-              'flex items-center',
-              showSidebar ? 'justify-between items-center' : 'justify-center',
-            ].join(' ')}
+              "flex items-center",
+              showSidebar ? "justify-between items-center" : "justify-center",
+            ].join(" ")}
           >
             <RenderIf condition={showSidebar}>
               <h1 className="text-blue-400 font-bold text-lg">Maya Tone </h1>
@@ -59,9 +59,9 @@ const Sidebar = ({ username, onLogout }) => {
             >
               <ChevronLeftIcon
                 className={[
-                  !showSidebar ? 'rotate-180' : 'rotate-0',
-                  'h-5 w-5 text-blue-500',
-                ].join(' ')}
+                  !showSidebar ? "rotate-180" : "rotate-0",
+                  "h-5 w-5 text-blue-500",
+                ].join(" ")}
               />
             </button>
           </div>
@@ -103,10 +103,11 @@ const Sidebar = ({ username, onLogout }) => {
           <div className="flex-1 overflow-y-auto px-4 py-4 space-y-8">
             <div>
               <h3 className="text-xs uppercase tracking-wider text-slate-500 mb-2">
-                Main
+                Dashboard
               </h3>
               <nav className="flex flex-col gap-1">
-                <MenuItem path="/" title="Dashboard" />
+                <MenuItem path="/" title="Summary" />
+                <MenuItem path="/project-overview" title="Project Overview" />
               </nav>
             </div>
             <div>

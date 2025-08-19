@@ -15,6 +15,7 @@ from .api.chat import chat_bp
 from .api.dashboard import dashboard_bp
 from .api.chart import chart_bp
 from .api.auth import auth_bp
+from .api.projects import projects_bp
 import requests
 
 
@@ -38,6 +39,7 @@ def create_app():
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(chart_bp)
     app.register_blueprint(auth_bp)
+    app.register_blueprint(projects_bp)
 
     @app.before_request
     def require_auth():

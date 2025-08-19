@@ -47,12 +47,23 @@ chart {
 Simple, clean list format like:
 
 **VG-12345** - In Progress
-Summary: Issue description here
-Priority: P2, Assignee: John Doe, Created: 2025-08-15
+🔹**Summary**: Issue description here
+🔹**Type**: Task
+🔹**Priority**: P2
+🔹**Assignee**: John Doe
+🔹**Created**: 2025-08-15
+🔹**Updated**: 2025-08-16
+🔹**Due Date**: 2025-08-20
+
 
 **VG-12346** - To Do  
-Summary: Another issue description
-Priority: P1, Assignee: Jane Smith, Created: 2025-08-14
+🔹**Summary**: Another issue description
+🔹**Type**: Story
+🔹**Priority**: P1
+🔹**Assignee**: Jane Smith
+🔹**Created**: 2025-08-14
+🔹**Updated**: 2025-08-16
+🔹**Due Date**: 2025-08-20
 
 ⚡ **Quick actions:**
 - **STRICT**: MUST get confirmation before ANY create/update/delete operations on issues or worklogs
