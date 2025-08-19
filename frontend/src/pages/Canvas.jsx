@@ -35,9 +35,8 @@ ChartJS.register(
 
 const Avatar = ({ sender }) => (
   <div
-    className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${
-      sender === 'user' ? 'bg-blue-500' : 'bg-slate-600'
-    }`}
+    className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${sender === 'user' ? 'bg-blue-500' : 'bg-slate-600'
+      }`}
   >
     {sender === 'user' ? 'U' : 'M'}
   </div>
@@ -73,6 +72,17 @@ export default function Canvas() {
       setLoading(true);
       try {
         const res = await fetch(`/api/chat/${activeChatId}`);
+        if (res.status === 404 || res.status === 401) {
+          // Chat doesn't exist or user doesn't have access
+          if (!ignore) {
+            setError('Chat not found or access denied');
+            // Redirect to dashboard after a short delay
+            setTimeout(() => {
+              navigate('/', { replace: true });
+            }, 2000);
+          }
+          return;
+        }
         const data = await res.json();
         if (!ignore) setMessages(data);
       } catch (e) {
@@ -85,11 +95,13 @@ export default function Canvas() {
     return () => {
       ignore = true;
     };
-  }, [activeChatId]);
+  }, [activeChatId, navigate]);
 
   useEffect(() => {
     if (!activeChatId) return;
-    socketRef.current = io('http://localhost:4000');
+    // Use current host instead of hardcoded localhost for network access
+    const socketUrl = `${window.location.protocol}//${window.location.hostname}:4000`;
+    socketRef.current = io(socketUrl);
     socketRef.current.emit('join_chat', { chat_id: activeChatId });
     socketRef.current.on('new_message', (data) => {
       if (data.chat_id === activeChatId) {
@@ -339,8 +351,7 @@ export default function Canvas() {
     setInput(
       (prev) =>
         prev ||
-        `Berikan insight singkat (1-2 kalimat) tentang distribusi ${
-          chartSpec.meta?.group_by || 'data'
+        `Berikan insight singkat (1-2 kalimat) tentang distribusi ${chartSpec.meta?.group_by || 'data'
         } di atas. Mulai langsung tanpa salam.`,
     );
   }, [chartSpec, autoInsight, latestAssistant]);
@@ -354,11 +365,9 @@ export default function Canvas() {
     const filterSegments = Object.entries(filters)
       .filter(([, arr]) => arr.length)
       .map(([k, arr]) => `${k}=${arr.join(',')}`);
-    return `Refine the previous chart using aggregate_issues. group_by=${group_by}. from=${
-      from || 'unchanged'
-    } to=${to || 'unchanged'} filters=${
-      filterSegments.join('; ') || 'none'
-    }. Return ONLY a chart spec code fence (chart).`;
+    return `Refine the previous chart using aggregate_issues. group_by=${group_by}. from=${from || 'unchanged'
+      } to=${to || 'unchanged'} filters=${filterSegments.join('; ') || 'none'
+      }. Return ONLY a chart spec code fence (chart).`;
   };
 
   const requestRefine = () => {
@@ -390,9 +399,8 @@ export default function Canvas() {
         if (data.success) {
           if (autoInsight && reason === 'change') {
             setLiveChart(data.chart);
-            const prompt = `Provide a concise updated insight (no greeting). Group by ${
-              form.group_by
-            }. Range ${form.from || 'default'} to ${form.to || 'default'}.`;
+            const prompt = `Provide a concise updated insight (no greeting). Group by ${form.group_by
+              }. Range ${form.from || 'default'} to ${form.to || 'default'}.`;
             setInput(prompt);
           }
         }
@@ -418,8 +426,8 @@ export default function Canvas() {
     chartSize === 'sm'
       ? 'max-w-[380px]'
       : chartSize === 'lg'
-      ? 'max-w-[860px]'
-      : 'max-w-[640px]';
+        ? 'max-w-[860px]'
+        : 'max-w-[640px]';
   const dragRef = useRef(null);
   const containerRef = useRef(null);
 
@@ -494,11 +502,10 @@ export default function Canvas() {
                         key={s}
                         type="button"
                         onClick={() => setChartSize(s)}
-                        className={`px-2 py-1 rounded border text-[11px] ${
-                          chartSize === s
-                            ? 'bg-blue-600 border-blue-500 text-white'
-                            : 'bg-slate-800/60 border-slate-600 hover:border-slate-500'
-                        }`}
+                        className={`px-2 py-1 rounded border text-[11px] ${chartSize === s
+                          ? 'bg-blue-600 border-blue-500 text-white'
+                          : 'bg-slate-800/60 border-slate-600 hover:border-slate-500'
+                          }`}
                       >
                         {s}
                       </button>
@@ -570,11 +577,10 @@ export default function Canvas() {
                                     type="button"
                                     key={val}
                                     onClick={() => updateFilter(k, val)}
-                                    className={`px-2 py-0.5 rounded text-[10px] border ${
-                                      filters[k]?.includes(val)
-                                        ? 'bg-blue-600 border-blue-500 text-white'
-                                        : 'bg-slate-700/60 border-slate-600 hover:border-slate-500'
-                                    }`}
+                                    className={`px-2 py-0.5 rounded text-[10px] border ${filters[k]?.includes(val)
+                                      ? 'bg-blue-600 border-blue-500 text-white'
+                                      : 'bg-slate-700/60 border-slate-600 hover:border-slate-500'
+                                      }`}
                                   >
                                     {val}
                                   </button>
@@ -664,15 +670,13 @@ export default function Canvas() {
             return (
               <div
                 key={i}
-                className={`flex gap-3 my-4 ${
-                  m.sender === 'user' ? 'flex-row-reverse' : ''
-                }`}
+                className={`flex gap-3 my-4 ${m.sender === 'user' ? 'flex-row-reverse' : ''
+                  }`}
               >
                 <Avatar sender={m.sender} />
                 <div
-                  className={`max-w-full md:max-w-md lg:max-w-lg xl:max-w-xl p-3 rounded-lg prose prose-invert prose-sm break-words ${
-                    m.sender === 'user' ? 'bg-blue-600' : 'bg-slate-700'
-                  } [&_pre]:whitespace-pre-wrap [&_pre]:max-h-60 [&_pre]:overflow-y-auto [&_code]:break-words`}
+                  className={`max-w-full md:max-w-md lg:max-w-lg xl:max-w-xl p-3 rounded-lg prose prose-invert prose-sm break-words ${m.sender === 'user' ? 'bg-blue-600' : 'bg-slate-700'
+                    } [&_pre]:whitespace-pre-wrap [&_pre]:max-h-60 [&_pre]:overflow-y-auto [&_code]:break-words`}
                   dangerouslySetInnerHTML={{
                     __html: marked.parse(m.content || ''),
                   }}

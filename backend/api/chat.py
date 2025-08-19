@@ -14,12 +14,35 @@ from ..db import (
     set_pending_action,
     clear_pending_action,
     touch_chat,
+    get_user_chats,
+    create_user_chat,
+    verify_chat_ownership,
+    delete_user_chat,
+    update_chat_title,
 )
 from ..services.openai_service import get_client, check_confirmation_intent
 from ..services.tool_dispatcher import execute as execute_tool
 from ..extensions import socketio  # For real-time emission of assistant replies
 
 chat_bp = Blueprint("chat", __name__)
+
+
+def get_current_user():
+    """Get current authenticated user from session"""
+    if not session.get("logged_in"):
+        return None
+    return session.get("jira_username")
+
+
+def require_auth():
+    """Check if user is authenticated, return user_id or error response"""
+    user_id = get_current_user()
+    if not user_id:
+        return None, (
+            jsonify({"success": False, "error": "Authentication required"}),
+            401,
+        )
+    return user_id, None
 
 
 def detect_chart_type(user_message: str, group_by: str = None, data_counts: list = None) -> str:
@@ -284,12 +307,11 @@ def build_tools(current_date: str, month_start: str):
 
 @chat_bp.route("/api/chat/new", methods=["POST"])
 def new_chat():
-    conn = sqlite3.connect("maya_tone.db")
-    c = conn.cursor()
-    from uuid import uuid4
+    user_id, error_response = require_auth()
+    if error_response:
+        return error_response
+    
     import random
-
-    chat_id = str(uuid4())
     WORDS = [
         "Orion",
         "Lumen",
@@ -311,28 +333,30 @@ def new_chat():
         "Matrix",
     ]
     title = f"{random.choice(WORDS)} {random.choice(WORDS)} {datetime.now().strftime('%H:%M')}"
-    c.execute(
-        "INSERT INTO chats (id, title, created_at, updated_at, user_id) VALUES (?, ?, ?, ?, ?)",
-        (chat_id, title, datetime.now(), datetime.now(), "user"),
-    )
-    conn.commit()
-    conn.close()
+    chat_id = create_user_chat(user_id, title)
     return jsonify({"chat_id": chat_id, "title": title})
 
 
 @chat_bp.route("/api/chat/history")
 def history():
-    conn = sqlite3.connect("maya_tone.db")
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    c.execute("SELECT id, title FROM chats ORDER BY updated_at DESC")
-    rows = [dict(r) for r in c.fetchall()]
-    conn.close()
-    return jsonify(rows)
+    user_id, error_response = require_auth()
+    if error_response:
+        return error_response
+    
+    chats = get_user_chats(user_id)
+    return jsonify(chats)
 
 
 @chat_bp.route("/api/chat/<chat_id>")
 def messages(chat_id):
+    user_id, error_response = require_auth()
+    if error_response:
+        return error_response
+    
+    # Verify chat ownership
+    if not verify_chat_ownership(chat_id, user_id):
+        return jsonify({"success": False, "error": "Chat not found or access denied"}), 404
+    
     conn = sqlite3.connect("maya_tone.db")
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
@@ -347,51 +371,52 @@ def messages(chat_id):
 
 @chat_bp.route("/api/chat/<chat_id>/delete", methods=["DELETE"])
 def delete_chat(chat_id):
-    conn = sqlite3.connect("maya_tone.db")
-    c = conn.cursor()
-    c.execute("DELETE FROM messages WHERE chat_id = ?", (chat_id,))
-    c.execute("DELETE FROM chats WHERE id = ?", (chat_id,))
-    conn.commit()
-    conn.close()
+    user_id, error_response = require_auth()
+    if error_response:
+        return error_response
+    
+    success = delete_user_chat(chat_id, user_id)
+    if not success:
+        return jsonify({"success": False, "error": "Chat not found or access denied"}), 404
+    
     return jsonify({"success": True})
 
 
 @chat_bp.route("/api/chat/<chat_id>/title", methods=["PUT"])
 def rename_chat(chat_id):
+    user_id, error_response = require_auth()
+    if error_response:
+        return error_response
+    
     data = request.json or {}
     title = (data.get("title", "") or "").strip()
     if not title:
         return jsonify({"success": False, "error": "Empty title"}), 400
-    conn = sqlite3.connect("maya_tone.db")
-    c = conn.cursor()
-    c.execute(
-        "UPDATE chats SET title = ?, updated_at = ? WHERE id = ?",
-        (title, datetime.now(), chat_id),
-    )
-    conn.commit()
-    conn.close()
+    
+    success = update_chat_title(chat_id, user_id, title)
+    if not success:
+        return jsonify({"success": False, "error": "Chat not found or access denied"}), 404
+    
     return jsonify({"success": True})
 
 
 @chat_bp.route("/api/chat/<chat_id>/ask", methods=["POST"])
 def ask(chat_id):
+    user_id, error_response = require_auth()
+    if error_response:
+        return error_response
+    
+    # Verify chat ownership
+    if not verify_chat_ownership(chat_id, user_id):
+        return jsonify({"success": False, "answer": "Chat not found or access denied"}), 404
+    
     payload = request.json or {}
     user_message = (payload.get("message") or "").strip()
     if not user_message:
         return jsonify({"success": False, "answer": "Pesan tidak boleh kosong."})
 
     # Get user from session and generate dynamic prompt
-    jira_username = session.get("jira_username")
-    if not jira_username:
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "answer": "Sesi Anda telah berakhir. Silakan login kembali.",
-                }
-            ),
-            401,
-        )
+    jira_username = user_id
     system_prompt = get_base_system_prompt(jira_username)
 
     client = get_client()
@@ -588,28 +613,21 @@ def ask(chat_id):
 
 @chat_bp.route("/api/chat/<chat_id>/ask_stream", methods=["POST"])
 def ask_stream(chat_id):
+    user_id, error_response = require_auth()
+    if error_response:
+        return error_response
+    
+    # Verify chat ownership
+    if not verify_chat_ownership(chat_id, user_id):
+        return jsonify({"success": False, "answer": "Chat not found or access denied"}), 404
+    
     payload = request.json or {}
     user_message = (payload.get("message") or "").strip()
     if not user_message:
         return jsonify({"success": False, "answer": "Pesan tidak boleh kosong."}), 400
 
     # Get user from session and generate dynamic prompt
-    jira_username = session.get("jira_username")
-    if not jira_username:
-        socketio.emit(
-            "assistant_error",
-            {"chat_id": chat_id, "error": "Sesi tidak valid."},
-            room=chat_id,
-        )
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "answer": "Sesi Anda telah berakhir. Silakan login kembali.",
-                }
-            ),
-            401,
-        )
+    jira_username = user_id
     system_prompt = get_base_system_prompt(jira_username)
 
     client = get_client()

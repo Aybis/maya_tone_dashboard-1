@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Route, Routes } from 'react-router-dom';
+import { Route, Routes, useNavigate, useLocation } from 'react-router-dom';
 import { ChatProvider } from './context/ChatContext';
 import { DashboardProvider } from './context/DashboardContext';
 import AiSearch from './pages/AiSearch';
@@ -12,6 +12,8 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [username, setUsername] = useState('');
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     checkAuth();
@@ -24,9 +26,18 @@ export default function App() {
         const data = await response.json();
         setIsAuthenticated(data.authenticated);
         setUsername(data.username || '');
+      } else {
+        // If not authenticated and on a protected route, clear it
+        if (location.pathname !== '/') {
+          navigate('/', { replace: true });
+        }
       }
     } catch (err) {
       console.error('Auth check failed:', err);
+      // On error, also clear any protected routes
+      if (location.pathname !== '/') {
+        navigate('/', { replace: true });
+      }
     } finally {
       setLoading(false);
     }
@@ -35,6 +46,8 @@ export default function App() {
   const handleLogin = (user) => {
     setIsAuthenticated(true);
     setUsername(user);
+    // Always redirect to dashboard after login to avoid stale routes
+    navigate('/', { replace: true });
   };
 
   const handleLogout = async () => {
@@ -42,6 +55,8 @@ export default function App() {
       await fetch('/api/logout', { method: 'POST' });
       setIsAuthenticated(false);
       setUsername('');
+      // Clear any existing route state
+      navigate('/', { replace: true });
     } catch (err) {
       console.error('Logout failed:', err);
     }
@@ -70,6 +85,8 @@ export default function App() {
               <Route path="/canvas" element={<Canvas />} />
               <Route path="/chat/:chatId" element={<Canvas />} />
               <Route path="/ai-search" element={<AiSearch />} />
+              {/* Fallback route - redirect any unknown routes to dashboard */}
+              <Route path="*" element={<Dashboard />} />
             </Routes>
           </main>
         </div>

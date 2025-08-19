@@ -24,6 +24,8 @@ export default function Login({ onLogin }) {
       const data = await response.json();
 
       if (data.success) {
+        // Clear any previous error state
+        setError("");
         onLogin(data.username);
       } else {
         setError(data.error || "Login failed");

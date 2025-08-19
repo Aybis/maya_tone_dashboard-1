@@ -26,6 +26,9 @@ def init_db():
             timestamp TIMESTAMP, FOREIGN KEY (chat_id) REFERENCES chats (id)
         )"""
     )
+    # Add index for better performance on user-specific queries
+    c.execute("CREATE INDEX IF NOT EXISTS idx_chats_user_id ON chats (user_id)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages (chat_id)")
     conn.commit()
     conn.close()
 
@@ -90,3 +93,76 @@ def touch_chat(chat_id):
     c.execute("UPDATE chats SET updated_at = ? WHERE id = ?", (datetime.now(), chat_id))
     conn.commit()
     conn.close()
+
+
+def get_user_chats(user_id):
+    """Get all chats for a specific user"""
+    conn = get_conn()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute(
+        "SELECT id, title FROM chats WHERE user_id = ? ORDER BY updated_at DESC",
+        (user_id,)
+    )
+    rows = [dict(r) for r in c.fetchall()]
+    conn.close()
+    return rows
+
+
+def create_user_chat(user_id, title):
+    """Create a new chat for a specific user"""
+    conn = get_conn()
+    c = conn.cursor()
+    from uuid import uuid4
+    
+    chat_id = str(uuid4())
+    c.execute(
+        "INSERT INTO chats (id, title, created_at, updated_at, user_id) VALUES (?, ?, ?, ?, ?)",
+        (chat_id, title, datetime.now(), datetime.now(), user_id),
+    )
+    conn.commit()
+    conn.close()
+    return chat_id
+
+
+def verify_chat_ownership(chat_id, user_id):
+    """Verify that a chat belongs to a specific user"""
+    conn = get_conn()
+    c = conn.cursor()
+    c.execute("SELECT user_id FROM chats WHERE id = ?", (chat_id,))
+    row = c.fetchone()
+    conn.close()
+    return row and row[0] == user_id
+
+
+def delete_user_chat(chat_id, user_id):
+    """Delete a chat only if it belongs to the user"""
+    conn = get_conn()
+    c = conn.cursor()
+    # First verify ownership
+    c.execute("SELECT user_id FROM chats WHERE id = ?", (chat_id,))
+    row = c.fetchone()
+    if not row or row[0] != user_id:
+        conn.close()
+        return False
+    
+    # Delete messages and chat
+    c.execute("DELETE FROM messages WHERE chat_id = ?", (chat_id,))
+    c.execute("DELETE FROM chats WHERE id = ? AND user_id = ?", (chat_id, user_id))
+    conn.commit()
+    conn.close()
+    return True
+
+
+def update_chat_title(chat_id, user_id, title):
+    """Update chat title only if it belongs to the user"""
+    conn = get_conn()
+    c = conn.cursor()
+    c.execute(
+        "UPDATE chats SET title = ?, updated_at = ? WHERE id = ? AND user_id = ?",
+        (title, datetime.now(), chat_id, user_id),
+    )
+    affected = c.rowcount
+    conn.commit()
+    conn.close()
+    return affected > 0
