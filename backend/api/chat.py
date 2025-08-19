@@ -302,6 +302,27 @@ def build_tools(current_date: str, month_start: str):
                 }
             }
         },
+        {
+            "type": "function",
+            "function": {
+                "name": "export_worklog_data",
+                "description": "Export worklog data in table format for a date range. Triggered when user asks to 'export data from X to Y' or similar phrasing with start and end dates. Produces a worklog export table with specific layout and grouping by calendar day.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "start_date": {
+                            "type": "string",
+                            "description": "Start date in YYYY-MM-DD format (inclusive)"
+                        },
+                        "end_date": {
+                            "type": "string",
+                            "description": "End date in YYYY-MM-DD format (inclusive)"
+                        }
+                    },
+                    "required": ["start_date", "end_date"]
+                }
+            }
+        },
     ]
 
 
@@ -585,6 +606,11 @@ def ask(chat_id):
             f"```chart\n{json.dumps(chart, ensure_ascii=False)}\n```\n\n{header}\n{rows}\n\n{insight}"
         )
 
+    if fname == "export_worklog_data":
+        # Return the table directly without additional processing
+        table_content = data_res.get("table", "No data available")
+        return send(table_content)
+
     tool_call_id = call.id
     summarizer_messages = messages_ + [
         {
@@ -723,6 +749,18 @@ def ask_stream(chat_id):
                 socketio.emit(
                     "assistant_end",
                     {"chat_id": chat_id, "content": answer},
+                    room=chat_id,
+                )
+                return jsonify({"success": True, "streamed": True})
+
+            if fname == "export_worklog_data":
+                # Return the table directly without additional processing
+                table_content = data_res.get("table", "No data available")
+                insert_message(chat_id, table_content, "assistant")
+                touch_chat(chat_id)
+                socketio.emit(
+                    "assistant_end",
+                    {"chat_id": chat_id, "content": table_content},
                     room=chat_id,
                 )
                 return jsonify({"success": True, "streamed": True})

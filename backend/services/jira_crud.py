@@ -1,6 +1,6 @@
 """Jira CRUD & worklog helper functions (now using session credentials)."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from ..utils.session_jira import get_session_credentials
 from typing import Dict, Any
 
@@ -252,3 +252,120 @@ def delete_issue(issue_key):
         return True, None
     except Exception as e:
         return False, f"Gagal hapus issue: {e}"
+
+
+def export_worklog_data(start_date: str, end_date: str, username: str, full_name: str):
+    """Export worklog data in the specified table format for date range."""
+    client = jira_client()
+    if not client:
+        return None, "Jira client tidak tersedia"
+    
+    try:
+        # Parse dates
+        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+        
+        # Validate date range
+        if start_dt > end_dt:
+            return {
+                "table": "| No | Issue Key | Issue Summary | Hours | MD | Work Date | Username | Full Name | Project Name | Activities Type |\n|---|---|---|---|---|---|---|---|---|---|\n| 1 |  | Invalid date range | 0 | 1 MD | " + start_date + " | " + username + " | " + full_name + " |  |  |"
+            }, None
+        
+        # Get all worklogs for the user in the date range
+        jql = f"worklogAuthor = '{username}' AND worklogDate >= '{start_date}' AND worklogDate <= '{end_date}'"
+        issues = client.search_issues(jql, maxResults=500, expand="changelog")
+        
+        # Collect all worklogs with issue details
+        worklog_data = []
+        project_cache = {}
+        
+        for issue in issues:
+            try:
+                # Get project name (cache to avoid repeated API calls)
+                project_key = issue.fields.project.key
+                if project_key not in project_cache:
+                    project_cache[project_key] = issue.fields.project.name
+                project_name = project_cache[project_key]
+                
+                # Get issue type
+                issue_type = issue.fields.issuetype.name if issue.fields.issuetype else ""
+                
+                # Get worklogs for this issue
+                for worklog in client.worklogs(issue.key):
+                    started = getattr(worklog, "started", "")
+                    if started and start_date <= started[:10] <= end_date:
+                        author_name = getattr(
+                            getattr(worklog, "author", None), "name", ""
+                        ) or getattr(getattr(worklog, "author", None), "displayName", "")
+                        
+                        if author_name == username:
+                            # Convert time spent to hours
+                            time_spent_seconds = getattr(worklog, "timeSpentSeconds", 0)
+                            hours = round(time_spent_seconds / 3600, 2) if time_spent_seconds else 0
+                            
+                            # Get worklog description (not issue summary)
+                            description = getattr(worklog, "comment", "") or "—"
+                            
+                            worklog_data.append({
+                                "issue_key": issue.key,
+                                "description": description,
+                                "hours": hours,
+                                "work_date": started[:10],
+                                "project_name": project_name,
+                                "issue_type": issue_type,
+                                "created": getattr(worklog, "created", started)
+                            })
+            except Exception:
+                continue
+        
+        # Get issues assigned to user for days with no worklogs
+        assigned_issues_jql = f"assignee = '{username}' AND created <= '{end_date}' AND (resolved is EMPTY OR resolved >= '{start_date}')"
+        try:
+            assigned_issues = client.search_issues(assigned_issues_jql, maxResults=200)
+            assigned_issues_map = {issue.key: issue.fields.summary for issue in assigned_issues}
+        except Exception:
+            assigned_issues_map = {}
+        
+        # Generate table for each day in range
+        table_rows = []
+        current_date = start_dt
+        day_no = 1
+        
+        while current_date <= end_dt:
+            date_str = current_date.strftime("%Y-%m-%d")
+            day_worklogs = [w for w in worklog_data if w["work_date"] == date_str]
+            
+            if day_worklogs:
+                # Sort by issue key, then by created time
+                day_worklogs.sort(key=lambda x: (x["issue_key"], x["created"]))
+                
+                for worklog in day_worklogs:
+                    table_rows.append(
+                        f"| {day_no} | {worklog['issue_key']} | {worklog['description']} | {worklog['hours']} | 1 MD | {date_str} | {username} | {full_name} | {worklog['project_name']} | {worklog['issue_type']} |"
+                    )
+            else:
+                # No worklogs for this day - show issue title according to issue key
+                if assigned_issues_map:
+                    # Get first available issue key and its title
+                    issue_key = next(iter(assigned_issues_map.keys()), "")
+                    issue_title = assigned_issues_map.get(issue_key, "")
+                else:
+                    issue_key = ""
+                    issue_title = ""
+                
+                table_rows.append(
+                    f"| {day_no} | {issue_key} | {issue_title} | 0 | 1 MD | {date_str} | {username} | {full_name} |  |  |"
+                )
+            
+            current_date += timedelta(days=1)
+            day_no += 1
+        
+        # Build complete table
+        header = "| No | Issue Key | Issue Summary | Hours | MD | Work Date | Username | Full Name | Project Name | Activities Type |"
+        separator = "|---|---|---|---|---|---|---|---|---|---|"
+        table = header + "\n" + separator + "\n" + "\n".join(table_rows)
+        
+        return {"table": table}, None
+        
+    except Exception as e:
+        return None, f"Error exporting worklog data: {e}"

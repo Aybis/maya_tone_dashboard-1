@@ -71,6 +71,19 @@ def execute(function_name: str, args: Dict) -> Tuple[Any, str]:
             project = args.get("project")  # Can be None
             users = jira_manager().fuzzy_search_users(partial_name, project, max_results)
             return users, None
+        if function_name == "export_worklog_data":
+            from ..utils.session_jira import get_session_credentials
+            from flask import session
+            
+            _, session_username, _ = get_session_credentials()
+            full_name = session.get("jira_display_name", session_username or "Unknown User")
+            
+            return jira_crud.export_worklog_data(
+                start_date=args.get("start_date"),
+                end_date=args.get("end_date"),
+                username=session_username or "unknown",
+                full_name=full_name
+            )
         return None, f"Fungsi '{function_name}' tidak ditemukan."
     except Exception as e:
         # Handle and log the exception, returning an error message
