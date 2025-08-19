@@ -1,3 +1,15 @@
 .venv/
 *.env
 *old
+maya_tone.db
+.vscode/
+**/__pycache__/
+
+# Ignore Python bytecode files
+*.py[cod]
+*.pyc
+**/*.pyc
+
+# Backend specific
+backend/**/__pycache__/
+backend/**/*.py[cod]
