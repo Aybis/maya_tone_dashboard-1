@@ -607,9 +607,21 @@ def ask(chat_id):
         )
 
     if fname == "export_worklog_data":
-        # Return the table directly without additional processing
+        # Return the table with embedded download data
         table_content = data_res.get("table", "No data available")
-        return send(table_content)
+        download_link = data_res.get("download_link")
+        filename = data_res.get("filename")
+        
+        if download_link and filename:
+            # Embed download data in a special format for frontend parsing
+            export_data = {
+                "download_link": download_link,
+                "filename": filename
+            }
+            table_with_download = f"{table_content}\n\n[EXPORT_DATA]{json.dumps(export_data)}[/EXPORT_DATA]"
+            return send(table_with_download)
+        else:
+            return send(table_content)
 
     tool_call_id = call.id
     summarizer_messages = messages_ + [
@@ -754,15 +766,33 @@ def ask_stream(chat_id):
                 return jsonify({"success": True, "streamed": True})
 
             if fname == "export_worklog_data":
-                # Return the table directly without additional processing
+                # Return the table with embedded download data
                 table_content = data_res.get("table", "No data available")
-                insert_message(chat_id, table_content, "assistant")
-                touch_chat(chat_id)
-                socketio.emit(
-                    "assistant_end",
-                    {"chat_id": chat_id, "content": table_content},
-                    room=chat_id,
-                )
+                download_link = data_res.get("download_link")
+                filename = data_res.get("filename")
+                
+                if download_link and filename:
+                    # Embed download data in a special format for frontend parsing
+                    export_data = {
+                        "download_link": download_link,
+                        "filename": filename
+                    }
+                    table_with_download = f"{table_content}\n\n[EXPORT_DATA]{json.dumps(export_data)}[/EXPORT_DATA]"
+                    insert_message(chat_id, table_with_download, "assistant")
+                    touch_chat(chat_id)
+                    socketio.emit(
+                        "assistant_end",
+                        {"chat_id": chat_id, "content": table_with_download},
+                        room=chat_id,
+                    )
+                else:
+                    insert_message(chat_id, table_content, "assistant")
+                    touch_chat(chat_id)
+                    socketio.emit(
+                        "assistant_end",
+                        {"chat_id": chat_id, "content": table_content},
+                        room=chat_id,
+                    )
                 return jsonify({"success": True, "streamed": True})
 
             tool_call_id = call.id
@@ -1025,6 +1055,21 @@ def ask_new():
                     else "Insight: Tidak ada data."
                 )
                 answer = f"```chart\n{json.dumps(chart, ensure_ascii=False)}\n```\n\n{header}\n{rows}\n\n{insight}"
+            elif fname == "export_worklog_data":
+                # Return the table with embedded download data
+                table_content = data_res.get("table", "No data available")
+                download_link = data_res.get("download_link")
+                filename = data_res.get("filename")
+                
+                if download_link and filename:
+                    # Embed download data in a special format for frontend parsing
+                    export_data = {
+                        "download_link": download_link,
+                        "filename": filename
+                    }
+                    answer = f"{table_content}\n\n[EXPORT_DATA]{_json.dumps(export_data)}[/EXPORT_DATA]"
+                else:
+                    answer = table_content
             else:
                 tool_call_id = call.id
                 summarizer_messages = messages_ + [
