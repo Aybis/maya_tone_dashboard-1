@@ -13,3 +13,4 @@ maya_tone.db
 # Backend specific
 backend/**/__pycache__/
 backend/**/*.py[cod]
+backend/templates/

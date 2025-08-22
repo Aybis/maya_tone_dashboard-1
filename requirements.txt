@@ -6,4 +6,4 @@ openai
 flask-socketio
 jira
 numpy
- 
+reportlab
