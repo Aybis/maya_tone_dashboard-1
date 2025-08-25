@@ -144,7 +144,7 @@ class JiraManager:
             params = {
                 "jql": jql,
                 "maxResults": max_results,
-                "fields": "key,summary,status,assignee,reporter,created,updated,priority,issuetype,description,project,duedate,worklog",
+                "fields": "key,summary,status,assignee,reporter,created,updated,priority,issuetype,description,project,duedate,worklog,customfield_10561",
             }
             r = self.session.get(f"{self.base_url}/rest/api/2/search", params=params)
             r.raise_for_status()
@@ -400,19 +400,25 @@ class JiraManager:
         out = []
         for issue in issues:
             f = issue.get("fields", {})
-            out.append(
-                {
-                    "key": issue.get("key"),
-                    "summary": f.get("summary", "No summary"),
-                    "status": (f.get("status") or {}).get("name", "Unknown"),
-                    "assignee": (f.get("assignee") or {}).get(
-                        "displayName", "Unassigned"
-                    ),
-                    "priority": (f.get("priority") or {}).get("name", "Medium"),
-                    "updated": (f.get("updated") or "")[:10],
-                    "url": f"{self.base_url}/browse/{issue.get('key')}",
-                }
-            )
+            ticket_data = {
+                "key": issue.get("key"),
+                "summary": f.get("summary", "No summary"),
+                "status": (f.get("status") or {}).get("name", "Unknown"),
+                "assignee": (f.get("assignee") or {}).get(
+                    "displayName", "Unassigned"
+                ),
+                "priority": (f.get("priority") or {}).get("name", "Medium"),
+                "updated": (f.get("updated") or "")[:10],
+                "url": f"{self.base_url}/browse/{issue.get('key')}",
+                "description": f.get("description", ""),
+                "issuetype": (f.get("issuetype") or {}).get("name", "Unknown"),
+            }
+            
+            # Add acceptance criteria for Story type issues
+            if ticket_data["issuetype"] == "Story":
+                ticket_data["acceptance_criteria"] = f.get("customfield_10561", "")
+            
+            out.append(ticket_data)
         return out
 
 

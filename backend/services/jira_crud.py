@@ -28,6 +28,44 @@ def jira_client():
         return None
 
 
+def get_issue_details(issue_key: str):
+    """Get detailed information about a specific issue by its key."""
+    client = jira_client()
+    if not client:
+        return None, "Jira client tidak tersedia"
+    try:
+        issue = client.issue(issue_key)
+        f = issue.fields
+        issue_data = {
+            "key": issue.key,
+            "fields": {
+                "summary": f.summary,
+                "status": {"name": f.status.name if f.status else None},
+                "assignee": {
+                    "displayName": (
+                        f.assignee.displayName if f.assignee else None
+                    )
+                },
+                "priority": {"name": f.priority.name if f.priority else None},
+                "created": f.created,
+                "updated": f.updated,
+                "dueDate": f.duedate,
+                "reporter": {"displayName": f.reporter.displayName if f.reporter else None},
+                "issuetype": {"name": f.issuetype.name},
+                "description": getattr(f, 'description', ''),
+                "project": {"key": f.project.key, "name": f.project.name} if f.project else None,
+            },
+        }
+        
+        # Add acceptance criteria for Story type issues
+        if f.issuetype and f.issuetype.name == "Story":
+            issue_data["fields"]["acceptance_criteria"] = getattr(f, 'customfield_10561', '')
+        
+        return issue_data, None
+    except Exception as e:
+        return None, f"Error mengambil detail issue {issue_key}: {e}"
+
+
 def execute_jql_search(jql_query: str, max_results: int = 50):
     client = jira_client()
     if not client:
@@ -37,26 +75,31 @@ def execute_jql_search(jql_query: str, max_results: int = 50):
         out = []
         for issue in issues:
             f = issue.fields
-            out.append(
-                {
-                    "key": issue.key,
-                    "fields": {
-                        "summary": f.summary,
-                        "status": {"name": f.status.name if f.status else None},
-                        "assignee": {
-                            "displayName": (
-                                f.assignee.displayName if f.assignee else None
-                            )
-                        },
-                        "priority": {"name": f.priority.name if f.priority else None},
-                        "created": f.created,
-                        "updated": f.updated,
-                        "dueDate": f.duedate,
-                        "reporter": {"displayName": f.reporter.displayName},
-                        "issuetype": {"name": f.issuetype.name}
+            issue_data = {
+                "key": issue.key,
+                "fields": {
+                    "summary": f.summary,
+                    "status": {"name": f.status.name if f.status else None},
+                    "assignee": {
+                        "displayName": (
+                            f.assignee.displayName if f.assignee else None
+                        )
                     },
-                }
-            )
+                    "priority": {"name": f.priority.name if f.priority else None},
+                    "created": f.created,
+                    "updated": f.updated,
+                    "dueDate": f.duedate,
+                    "reporter": {"displayName": f.reporter.displayName},
+                    "issuetype": {"name": f.issuetype.name},
+                    "description": getattr(f, 'description', ''),
+                },
+            }
+            
+            # Add acceptance criteria for Story type issues
+            if f.issuetype and f.issuetype.name == "Story":
+                issue_data["fields"]["acceptance_criteria"] = getattr(f, 'customfield_10561', '')
+            
+            out.append(issue_data)
         return out, None
     except Exception as e:
         return None, f"Error eksekusi JQL: {e}"
@@ -106,6 +149,33 @@ def get_issue_types(project_key=None):
         return [{"name": t.name} for t in client.issue_types()], None
     except Exception as e:
         return None, f"Error issue types: {e}"
+
+
+def get_issue_worklogs(issue_key: str):
+    """Get all worklogs for a specific issue - useful for finding worklog IDs."""
+    client = jira_client()
+    if not client:
+        return None, "Jira client tidak tersedia"
+    try:
+        worklogs = client.worklogs(issue_key)
+        rows = []
+        for w in worklogs:
+            author_name = getattr(
+                getattr(w, "author", None), "name", ""
+            ) or getattr(getattr(w, "author", None), "displayName", "")
+            rows.append(
+                {
+                    "id": w.id,
+                    "issueKey": issue_key,
+                    "comment": getattr(w, "comment", ""),
+                    "timeSpent": getattr(w, "timeSpent", ""),
+                    "started": getattr(w, "started", ""),
+                    "author": author_name,
+                }
+            )
+        return rows, None
+    except Exception as e:
+        return None, f"Error mengambil worklog untuk {issue_key}: {e}"
 
 
 def get_worklogs(from_date: str, to_date: str, username: str):
@@ -170,6 +240,15 @@ def update_worklog(issue_key, worklog_id, time_spent_hours=None, description=Non
     if not client:
         return None, "Jira client tidak terinisialisasi."
     try:
+        # First, let's validate that the worklog exists and get available worklog IDs for debugging
+        try:
+            all_worklogs = client.worklogs(issue_key)
+            available_ids = [str(w.id) for w in all_worklogs]
+            print(f"DEBUG: Available worklog IDs for {issue_key}: {available_ids}")
+            print(f"DEBUG: Trying to update worklog ID: {worklog_id}")
+        except Exception as debug_e:
+            print(f"DEBUG: Could not fetch worklogs for debugging: {debug_e}")
+        
         data = {}
         if time_spent_hours is not None:
             data["timeSpentSeconds"] = int(float(time_spent_hours) * 3600)
@@ -177,11 +256,20 @@ def update_worklog(issue_key, worklog_id, time_spent_hours=None, description=Non
             data["comment"] = description
         if not data:
             return None, "Tidak ada data untuk diupdate."
+        
         wl = client.worklog(issue_key, worklog_id)
         wl.update(**data)
         return {"id": wl.id, "issueKey": issue_key}, None
     except Exception as e:
-        return None, f"Gagal update worklog: {e}"
+        # Enhanced error message with debugging info
+        error_msg = f"Gagal update worklog: {e}"
+        try:
+            all_worklogs = client.worklogs(issue_key)
+            available_ids = [str(w.id) for w in all_worklogs]
+            error_msg += f" | Available worklog IDs for {issue_key}: {available_ids}"
+        except:
+            pass
+        return None, error_msg
 
 
 def delete_worklog(issue_key, worklog_id):
@@ -241,6 +329,8 @@ def update_issue(issue_key, updates: Dict[str, Any]):
                 field_updates["priority"] = {"name": value}
             elif key == "issuetype_name":
                 field_updates["issuetype"] = {"name": value}
+            elif key == "acceptance_criteria":
+                field_updates["customfield_10561"] = value
             else:
                 field_updates[key] = value
 

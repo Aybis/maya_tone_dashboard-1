@@ -30,12 +30,16 @@ def execute(function_name: str, args: Dict) -> Tuple[Any, str]:
     """
     try:
         # Dispatch mapping from function name to CRUD or aggregation operation
+        if function_name == "get_issue_details":
+            return jira_crud.get_issue_details(**args)
         if function_name == "get_issues":
             return jira_crud.execute_jql_search(**args)
         if function_name == "get_projects":
             return jira_crud.get_all_projects()
         if function_name == "get_issue_types":
             return jira_crud.get_issue_types(**args)
+        if function_name == "get_issue_worklogs":
+            return jira_crud.get_issue_worklogs(**args)
         if function_name == "get_worklogs":
             from ..utils.session_jira import get_session_credentials
 

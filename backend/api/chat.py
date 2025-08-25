@@ -145,6 +145,23 @@ def build_tools(current_date: str, month_start: str):
         {
             "type": "function",
             "function": {
+                "name": "get_issue_details",
+                "description": "Get detailed information about a specific issue by its key (e.g., VG-17269). Use this when user asks for details about a specific issue.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "issue_key": {
+                            "type": "string",
+                            "description": "The issue key (e.g., VG-17269, PROJ-123)",
+                        },
+                    },
+                    "required": ["issue_key"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
                 "name": "get_issues",
                 "description": f"Cari issue via JQL gunakan tanggal real-time: today={current_date} month_start={month_start}",
                 "parameters": {
@@ -179,6 +196,20 @@ def build_tools(current_date: str, month_start: str):
                 "parameters": {
                     "type": "object",
                     "properties": {"project_key": {"type": "string"}},
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_issue_worklogs",
+                "description": "Get all worklogs for a specific issue - useful when user needs to find worklog IDs for update/delete operations.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "issue_key": {"type": "string", "description": "Issue key (e.g., VG-17348)"},
+                    },
+                    "required": ["issue_key"],
                 },
             },
         },
@@ -249,7 +280,7 @@ def build_tools(current_date: str, month_start: str):
             "type": "function",
             "function": {
                 "name": "manage_issue",
-                "description": "Create / update issue. Gunakan action=create|update. Untuk create/update sertakan fields di details. Tidak ada delete issue.",
+                "description": "Create / update issue. Gunakan action=create|update. Untuk create/update sertakan fields di details. Always include description field. For Story type issues, include acceptance_criteria field. Tidak ada delete issue.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -259,17 +290,17 @@ def build_tools(current_date: str, month_start: str):
                         },
                         "details": {
                             "type": "object",
-                            "description": "Field issue. For update/delete sertakan issue_key.",
+                            "description": "Field issue. For update sertakan issue_key.",
                             "properties": {
-                                "issue_key": {"type": "string"},
-                                "project_key": {"type": "string"},
-                                "summary": {"type": "string"},
-                                "description": {"type": "string"},
-                                "acceptance_criteria": {"type": "string"},
-                                "priority_name": {"type": "string", "default": "P2"},
-                                "assignee_name": {"type": "string"},
-                                "duedate": {"type": "string"},
-                                "issuetype_name": {"type": "string", "defaulr": "Bug"},
+                                "issue_key": {"type": "string", "description": "Required for update action"},
+                                "project_key": {"type": "string", "description": "Required for create action"},
+                                "summary": {"type": "string", "description": "Issue title/summary"},
+                                "description": {"type": "string", "description": "Detailed description of the issue - always include this field"},
+                                "acceptance_criteria": {"type": "string", "description": "Acceptance criteria for Story type issues only (stored in customfield_10561)"},
+                                "priority_name": {"type": "string", "default": "P2", "description": "Priority level"},
+                                "assignee_name": {"type": "string", "description": "Username to assign the issue to"},
+                                "duedate": {"type": "string", "description": "Due date in YYYY-MM-DD format"},
+                                "issuetype_name": {"type": "string", "default": "Task", "description": "Issue type (Task, Story, Bug, etc.)"},
                             },
                         },
                     },
