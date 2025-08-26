@@ -354,6 +354,44 @@ def build_tools(current_date: str, month_start: str):
                 }
             }
         },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_issue_transitions",
+                "description": "Get all available status transitions for a specific issue. Use this when user wants to know what status changes are possible for an issue.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "issue_key": {
+                            "type": "string",
+                            "description": "The issue key (e.g., VG-17269, PROJ-123)"
+                        }
+                    },
+                    "required": ["issue_key"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "update_issue_status",
+                "description": "Update the status of an issue. This will automatically find the correct transition to move the issue to the target status.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "issue_key": {
+                            "type": "string",
+                            "description": "The issue key (e.g., VG-17269, PROJ-123)"
+                        },
+                        "target_status": {
+                            "type": "string",
+                            "description": "The target status name (e.g., 'In Progress', 'Done', 'To Do', 'Backlog')"
+                        }
+                    },
+                    "required": ["issue_key", "target_status"]
+                }
+            }
+        },
     ]
 
 

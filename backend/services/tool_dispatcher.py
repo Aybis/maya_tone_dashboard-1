@@ -100,6 +100,12 @@ def execute(function_name: str, args: Dict) -> Tuple[Any, str]:
                 username=session_username or "unknown",
                 full_name=full_name
             )
+        if function_name == "get_issue_transitions":
+            return jira_crud.get_issue_transitions(**args)
+        if function_name == "update_issue_status":
+            issue_key = args.get("issue_key")
+            target_status = args.get("target_status")
+            return jira_crud.update_issue_status(issue_key, target_status)
         return None, f"Fungsi '{function_name}' tidak ditemukan."
     except Exception as e:
         # Handle and log the exception, returning an error message

@@ -351,6 +351,68 @@ def delete_issue(issue_key):
     except Exception as e:
         return False, f"Gagal hapus issue: {e}"
 
+
+def get_issue_transitions(issue_key):
+    """Get all available transitions for a specific issue."""
+    client = jira_client()
+    if not client:
+        return None, "Jira client tidak tersedia"
+    try:
+        transitions = client.transitions(issue_key)
+        transition_list = []
+        for transition in transitions:
+            transition_data = {
+                "id": transition["id"],
+                "name": transition["name"],
+                "to": {
+                    "name": transition["to"]["name"],
+                    "id": transition["to"]["id"]
+                }
+            }
+            transition_list.append(transition_data)
+        return transition_list, None
+    except Exception as e:
+        return None, f"Error mengambil transitions untuk {issue_key}: {e}"
+
+
+def update_issue_status(issue_key, target_status_name):
+    """Update issue status by finding and executing the appropriate transition."""
+    client = jira_client()
+    if not client:
+        return None, "Jira client tidak tersedia"
+    
+    try:
+        # First, get all available transitions
+        transitions = client.transitions(issue_key)
+        
+        # Find the transition that leads to the target status
+        target_transition = None
+        for transition in transitions:
+            # Check both transition name and destination status name
+            if (transition["name"].lower() == target_status_name.lower() or 
+                transition["to"]["name"].lower() == target_status_name.lower()):
+                target_transition = transition
+                break
+        
+        if not target_transition:
+            # Return available transitions for debugging
+            available_transitions = [
+                f"{t['name']} -> {t['to']['name']}" for t in transitions
+            ]
+            return None, f"Status '{target_status_name}' tidak tersedia. Transitions yang tersedia: {', '.join(available_transitions)}"
+        
+        # Execute the transition
+        client.transition_issue(issue_key, target_transition["id"])
+        
+        return {
+            "key": issue_key,
+            "transition_executed": target_transition["name"],
+            "new_status": target_transition["to"]["name"]
+        }, None
+        
+    except Exception as e:
+        return None, f"Error mengupdate status issue {issue_key}: {e}"
+
 def export_worklog_data(start_date: str, end_date: str, username: str, full_name: str):
     """Export worklog data in table format with PDF download option."""
     client = jira_client()
