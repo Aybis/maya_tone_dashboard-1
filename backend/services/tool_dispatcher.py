@@ -30,12 +30,16 @@ def execute(function_name: str, args: Dict) -> Tuple[Any, str]:
     """
     try:
         # Dispatch mapping from function name to CRUD or aggregation operation
+        if function_name == "get_issue_details":
+            return jira_crud.get_issue_details(**args)
         if function_name == "get_issues":
             return jira_crud.execute_jql_search(**args)
         if function_name == "get_projects":
             return jira_crud.get_all_projects()
         if function_name == "get_issue_types":
             return jira_crud.get_issue_types(**args)
+        if function_name == "get_issue_worklogs":
+            return jira_crud.get_issue_worklogs(**args)
         if function_name == "get_worklogs":
             from ..utils.session_jira import get_session_credentials
 
@@ -96,6 +100,12 @@ def execute(function_name: str, args: Dict) -> Tuple[Any, str]:
                 username=session_username or "unknown",
                 full_name=full_name
             )
+        if function_name == "get_issue_transitions":
+            return jira_crud.get_issue_transitions(**args)
+        if function_name == "update_issue_status":
+            issue_key = args.get("issue_key")
+            target_status = args.get("target_status")
+            return jira_crud.update_issue_status(issue_key, target_status)
         return None, f"Fungsi '{function_name}' tidak ditemukan."
     except Exception as e:
         # Handle and log the exception, returning an error message

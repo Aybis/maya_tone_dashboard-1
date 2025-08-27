@@ -1,27 +1,27 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
 
 function ProjectOverview() {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    fetchProjectsOverview();
-  }, []);
+  // useEffect(() => {
+  //   fetchProjectsOverview();
+  // }, []);
 
   const fetchProjectsOverview = async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/projects/overview");
+      const response = await fetch('/api/projects/overview');
       const data = await response.json();
 
       if (data.success) {
         setProjects(data.projects);
       } else {
-        setError(data.error || "Failed to fetch projects");
+        setError(data.error || 'Failed to fetch projects');
       }
     } catch (err) {
-      setError("Network error occurred");
+      setError('Network error occurred');
     } finally {
       setLoading(false);
     }
@@ -97,7 +97,7 @@ function ProjectOverview() {
           className="px-3 py-2 text-sm rounded bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 transition-colors"
           disabled={loading}
         >
-          {loading ? "Loading..." : "Refresh"}
+          {loading ? 'Loading...' : 'Refresh'}
         </button>
       </header>
 
@@ -215,7 +215,7 @@ function ProjectOverview() {
                           <div className="flex items-center space-x-1">
                             {renderCollaborators(
                               project.collaborators,
-                              project.totalCollaborators
+                              project.totalCollaborators,
                             )}
                           </div>
                           <div className="flex flex-col">

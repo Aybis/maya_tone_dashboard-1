@@ -1,3 +1,165 @@
+/* Animated gradient border: static frame, glow slides left -> right */
+@keyframes slideGlow {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 100% 50%;
+  }
+}
+/* Generic left->right background animation (alias) */
+@keyframes leftToRight {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 100% 50%;
+  }
+}
+/* Subtle gradient shift for user chat bubble */
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+/* Utility class to apply left->right gradient animation */
+.gradient-animate-x {
+  /* legacy shorter animation retained if still referenced */
+  background-size: 300% 100%;
+  animation: leftToRight 10s linear infinite;
+}
+/* Seamless variant: duplicate gradient sequence and animate only first half to remove jump */
+@keyframes seamlessSlide {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 50% 50%;
+  }
+}
+.gradient-animate-x-smooth {
+  background: linear-gradient(
+    90deg,
+    /* first sequence */ #06b6d4 0%,
+    #22d3ee 5%,
+    #3b82f6 10%,
+    #6366f1 17%,
+    #7c3aed 23%,
+    #8b5cf6 30%,
+    #a855f7 37%,
+    #d946ef 44%,
+    #ec4899 50%,
+    /* second (duplicate) sequence for seamless loop */ #06b6d4 50.01%,
+    #22d3ee 55%,
+    #3b82f6 60%,
+    #6366f1 67%,
+    #7c3aed 73%,
+    #8b5cf6 80%,
+    #a855f7 87%,
+    #d946ef 94%,
+    #ec4899 100%
+  );
+  background-size: 200% 100%;
+  animation: seamlessSlide 5s linear infinite;
+}
+@keyframes orbitSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Animated gradient border where only the colors travel around (border shape stays still) */
+@property --angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes borderHueCycle {
+  to {
+    --angle: 360deg;
+  }
+}
+
+.animated-gradient-border {
+  position: relative;
+  border-radius: 1.5rem;
+  isolation: isolate;
+}
+.animated-gradient-border::before {
+  /* inner panel */
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: inherit;
+  background: rgba(24, 24, 32, 0.82);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.animated-gradient-border::after {
+  /* seamless duplicated gradient ring */
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2px;
+  background: linear-gradient(
+    90deg,
+    #06b6d4 0%,
+    #22d3ee 5%,
+    #3b82f6 10%,
+    #6366f1 17%,
+    #7c3aed 23%,
+    #8b5cf6 30%,
+    #a855f7 37%,
+    #d946ef 44%,
+    #ec4899 50%,
+    #06b6d4 50.01%,
+    #22d3ee 55%,
+    #3b82f6 60%,
+    #6366f1 67%,
+    #7c3aed 73%,
+    #8b5cf6 80%,
+    #a855f7 87%,
+    #d946ef 94%,
+    #ec4899 100%
+  );
+  background-size: 200% 100%;
+  animation: seamlessSlide 38s linear infinite;
+  opacity: 0.5;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+/* Rotating highlight arc */
+.animated-gradient-border .orbit-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2px;
+  pointer-events: none;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    transparent 330deg,
+    rgba(255, 255, 255, 0.9) 345deg,
+    transparent 360deg
+  );
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.55))
+    drop-shadow(0 0 16px rgba(139, 92, 246, 0.55));
+  animation: orbitSpin 5s linear infinite;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -27,4 +189,19 @@ body {
 }
 .prose tbody tr:hover {
   @apply bg-slate-700/30;
+}
+
+/* Chat message animation */
+@keyframes fadeInSlide {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-in-slide {
+  animation: fadeInSlide 0.35s ease forwards;
 }

@@ -1,18 +1,18 @@
-import { useEffect, useState } from "react";
-import { Route, Routes, useNavigate, useLocation } from "react-router-dom";
-import { ChatProvider } from "./context/ChatContext";
-import { DashboardProvider } from "./context/DashboardContext";
-import AiSearch from "./pages/AiSearch";
-import Canvas from "./pages/Canvas";
-import Dashboard from "./pages/Dashboard";
-import ProjectOverview from "./pages/ProjectOverview";
-import Login from "./pages/Login";
-import Sidebar from "./app/Sidebar";
+import { useEffect, useState } from 'react';
+import { Route, Routes, useNavigate, useLocation } from 'react-router-dom';
+import { ChatProvider } from './context/ChatContext';
+import { DashboardProvider } from './context/DashboardContext';
+import AiSearch from './pages/AiSearch';
+import Canvas from './pages/Canvas';
+import Dashboard from './pages/Dashboard';
+import ProjectOverview from './pages/ProjectOverview';
+import Login from './pages/Login';
+import Sidebar from './app/Sidebar';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [username, setUsername] = useState("");
+  const [username, setUsername] = useState('');
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -22,22 +22,27 @@ export default function App() {
 
   const checkAuth = async () => {
     try {
-      const response = await fetch("/api/check-auth");
+      const response = await fetch('/api/check-auth');
+
       if (response.ok) {
         const data = await response.json();
+        console.log(data, '<<< response');
+        if (data.username) {
+          localStorage.setItem('username', data.username);
+        }
         setIsAuthenticated(data.authenticated);
-        setUsername(data.username || "");
+        setUsername(data.username || '');
       } else {
         // If not authenticated and on a protected route, clear it
-        if (location.pathname !== "/") {
-          navigate("/", { replace: true });
+        if (location.pathname !== '/') {
+          navigate('/', { replace: true });
         }
       }
     } catch (err) {
-      console.error("Auth check failed:", err);
+      console.error('Auth check failed:', err);
       // On error, also clear any protected routes
-      if (location.pathname !== "/") {
-        navigate("/", { replace: true });
+      if (location.pathname !== '/') {
+        navigate('/', { replace: true });
       }
     } finally {
       setLoading(false);
@@ -48,18 +53,18 @@ export default function App() {
     setIsAuthenticated(true);
     setUsername(user);
     // Always redirect to dashboard after login to avoid stale routes
-    navigate("/", { replace: true });
+    navigate('/', { replace: true });
   };
 
   const handleLogout = async () => {
     try {
-      await fetch("/api/logout", { method: "POST" });
+      await fetch('/api/logout', { method: 'POST' });
       setIsAuthenticated(false);
-      setUsername("");
+      setUsername('');
       // Clear any existing route state
-      navigate("/", { replace: true });
+      navigate('/', { replace: true });
     } catch (err) {
-      console.error("Logout failed:", err);
+      console.error('Logout failed:', err);
     }
   };
 
