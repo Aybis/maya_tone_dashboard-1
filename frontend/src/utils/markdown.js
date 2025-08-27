@@ -61,7 +61,7 @@ export const renderCardMarkdown = (raw) => {
     return segments
       .map((seg, idx) => {
         if (seg.type === 'ticket') {
-          return `<article class="md-card border border-slate-700/60 bg-slate-800/40 rounded-lg p-4 shadow-sm">${marked.parse(
+          return `<article class="md-card border text-sm border-zinc-700/60 bg-zinc-700/40 rounded-lg p-4 shadow-lg">${marked.parse(
             seg.content,
           )}</article>`;
         }
@@ -69,7 +69,7 @@ export const renderCardMarkdown = (raw) => {
         const isOpener = idx === 0 && hasTicket;
         if (isOpener) {
           // opener sits above first card without card styling
-          return `<div class="md-opener mb-3 text-slate-300">${marked.parse(
+          return `<div class="md-opener mb-3 text-zinc-300">${marked.parse(
             seg.content,
           )}</div>`;
         }
@@ -125,7 +125,7 @@ export const renderCardMarkdown = (raw) => {
 
         // Replace with processed segments
         segments.splice(0, segments.length, ...processed);
-        return `<div class="md-ai-notes mt-4 pt-3 border-t border-slate-700/40 text-slate-400 text-sm leading-relaxed">${marked.parse(
+        return `<div class="md-ai-notes mt-4 pt-3 border-t border-zinc-700/40 text-zinc-400 text-sm leading-relaxed">${marked.parse(
           seg.content,
         )}</div>`;
       })

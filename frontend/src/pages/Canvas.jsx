@@ -33,9 +33,9 @@ ChartJS.register(
 // Configure marked once
 marked.setOptions({
   gfm: true,
-  breaks: false,
-  mangle: false,
-  headerIds: false,
+  breaks: true,
+  mangle: true,
+  headerIds: true,
 });
 
 import { extractChartSpec } from '../utils/markdown';
@@ -71,9 +71,9 @@ export default function Canvas() {
   });
 
   return (
-    <div className="flex flex-col h-screen bg-[#0f0f23] text-slate-50">
+    <div className="flex flex-col h-screen bg-zinc-800 text-slate-50">
       <div className="flex-1 overflow-y-auto px-3 sm:px-6 py-4">
-        <div className="mx-auto w-full max-w-3xl space-y-6">
+        <div className="mx-auto w-full max-w-6xl space-y-6 pt-4">
           {!hasInteracted && !messages.length && !loading && (
             <ChatHero onSubmit={send} disabled={loading} />
           )}
@@ -88,10 +88,10 @@ export default function Canvas() {
           )}
           {loading && (
             <div className="flex w-full">
-              <div className="bg-slate-800/70 rounded-xl px-4 py-4 border border-slate-700/70 text-sm flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
-                <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse [animation-delay:0.15s]" />
-                <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse [animation-delay:0.3s]" />
+              <div className="bg-zinc-800/70 rounded-xl px-4 py-4 border border-zinc-700/70 text-sm flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-zinc-400 animate-pulse" />
+                <div className="w-2 h-2 rounded-full bg-zinc-400 animate-pulse [animation-delay:0.15s]" />
+                <div className="w-2 h-2 rounded-full bg-zinc-400 animate-pulse [animation-delay:0.3s]" />
               </div>
             </div>
           )}

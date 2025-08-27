@@ -11,7 +11,7 @@ export default function ChartRenderer({ spec }) {
   }
   if (!chartData) {
     return (
-      <div className="text-xs text-amber-500">Invalid chart spec format.</div>
+      <div className="text-base text-amber-500">Invalid chart spec format.</div>
     );
   }
   // Ensure datasets array has basic styling defaults to avoid Chart.js errors
@@ -38,7 +38,7 @@ export default function ChartRenderer({ spec }) {
   };
   const common = { data: chartData, options: baseOptions };
   const cls =
-    'w-full h-72 bg-slate-900/40 border border-slate-700/60 rounded-lg p-4';
+    'w-full h-72 bg-zinc-900/40 border border-zinc-700/60 rounded-lg p-4';
   const t = (type || '').toLowerCase();
   switch (t) {
     case 'line':
@@ -74,7 +74,7 @@ export default function ChartRenderer({ spec }) {
       );
     default:
       return (
-        <div className="text-xs text-red-500">
+        <div className="text-base text-red-500">
           Unsupported chart type: {type}
         </div>
       );

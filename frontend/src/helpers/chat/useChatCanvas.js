@@ -88,7 +88,11 @@ export function useChatCanvas({
           if (lastAssistant && lastAssistant.content === data.content)
             return prev;
         }
-        let messageObj = { sender: data.sender, content: data.content };
+        let messageObj = {
+          sender: data.sender,
+          content: data.content,
+          timestamp: data.timestamp || new Date().toISOString(),
+        };
         if (data.sender === 'assistant') {
           const { cleaned, downloadData } = extractExportData(data.content);
           messageObj.content = cleaned;
@@ -99,32 +103,50 @@ export function useChatCanvas({
       });
       setLoading(false);
     });
-    s.on('assistant_start', ({ chat_id }) => {
+    s.on('assistant_start', ({ chat_id, timestamp }) => {
       if (chat_id !== activeChatId) return;
       setLoading(true);
-      setMessages((p) => [...p, { sender: 'assistant', content: '' }]);
+      setMessages((p) => [
+        ...p,
+        {
+          sender: 'assistant',
+          content: '',
+          timestamp: timestamp || new Date().toISOString(),
+          partial: true,
+        },
+      ]);
     });
-    s.on('assistant_delta', ({ chat_id, delta }) => {
+    s.on('assistant_delta', ({ chat_id, delta, timestamp }) => {
       if (chat_id !== activeChatId) return;
       setMessages((prev) => {
         const copy = [...prev];
         for (let i = copy.length - 1; i >= 0; i--) {
           if (copy[i].sender === 'assistant') {
-            copy[i] = { ...copy[i], content: (copy[i].content || '') + delta };
+            copy[i] = {
+              ...copy[i],
+              content: (copy[i].content || '') + delta,
+              timestamp:
+                copy[i].timestamp || timestamp || new Date().toISOString(),
+            };
             break;
           }
         }
         return copy;
       });
     });
-    s.on('assistant_end', ({ chat_id, content }) => {
+    s.on('assistant_end', ({ chat_id, content, timestamp }) => {
       if (chat_id !== activeChatId) return;
       setMessages((prev) => {
         const copy = [...prev];
         for (let i = copy.length - 1; i >= 0; i--) {
           if (copy[i].sender === 'assistant') {
             const { cleaned, downloadData } = extractExportData(content);
-            copy[i] = { ...copy[i], content: cleaned };
+            copy[i] = {
+              ...copy[i],
+              content: cleaned,
+              timestamp: timestamp || copy[i].timestamp,
+              partial: false,
+            };
             if (downloadData?.download_link)
               copy[i].downloadData = downloadData;
             break;
@@ -184,7 +206,10 @@ export function useChatCanvas({
         }
         return;
       }
-      setMessages((prev) => [...prev, { sender: 'user', content }]);
+      setMessages((prev) => [
+        ...prev,
+        { sender: 'user', content, timestamp: new Date().toISOString() },
+      ]);
       try {
         await fetch(`/api/chat/${activeChatId}/ask_stream`, {
           method: 'POST',
