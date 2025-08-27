@@ -23,8 +23,35 @@ from ..db import (
 from ..services.openai_service import get_client, check_confirmation_intent
 from ..services.tool_dispatcher import execute as execute_tool
 from ..extensions import socketio  # For real-time emission of assistant replies
+from ..chat_helpers import build_chart_markdown, build_export_markdown
 
 chat_bp = Blueprint("chat", __name__)
+
+# Shared random words for chat title generation
+WORDS = [
+    "Orion",
+    "Lumen",
+    "Echo",
+    "Nova",
+    "Aster",
+    "Nimbus",
+    "Quartz",
+    "Atlas",
+    "Zenith",
+    "Pulse",
+    "Vertex",
+    "Cipher",
+    "Delta",
+    "Photon",
+    "Vortex",
+    "Comet",
+    "Helix",
+    "Matrix",
+]
+
+def generate_chat_title():
+    import random
+    return f"{random.choice(WORDS)} {random.choice(WORDS)} {datetime.now().strftime('%H:%M')}"
 
 
 def get_current_user():
@@ -401,28 +428,7 @@ def new_chat():
     if error_response:
         return error_response
     
-    import random
-    WORDS = [
-        "Orion",
-        "Lumen",
-        "Echo",
-        "Nova",
-        "Aster",
-        "Nimbus",
-        "Quartz",
-        "Atlas",
-        "Zenith",
-        "Pulse",
-        "Vertex",
-        "Cipher",
-        "Delta",
-        "Photon",
-        "Vortex",
-        "Comet",
-        "Helix",
-        "Matrix",
-    ]
-    title = f"{random.choice(WORDS)} {random.choice(WORDS)} {datetime.now().strftime('%H:%M')}"
+    title = generate_chat_title()
     chat_id = create_user_chat(user_id, title)
     return jsonify({"chat_id": chat_id, "title": title})
 
@@ -451,10 +457,15 @@ def messages(chat_id):
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
     c.execute(
-        "SELECT content, sender FROM messages WHERE chat_id = ? ORDER BY timestamp ASC",
+        "SELECT content, sender, timestamp FROM messages WHERE chat_id = ? ORDER BY timestamp ASC",
         (chat_id,),
     )
-    msgs = [dict(r) for r in c.fetchall()]
+    rows = c.fetchall()
+    # Normalize timestamp to ISO string for frontend
+    msgs = [
+        {"content": r["content"], "sender": r["sender"], "timestamp": r["timestamp"]}
+        for r in rows
+    ]
     conn.close()
     return jsonify(msgs)
 
@@ -521,7 +532,7 @@ def ask(chat_id):
         try:
             socketio.emit(
                 "new_message",
-                {"chat_id": chat_id, "sender": "assistant", "content": answer},
+                {"chat_id": chat_id, "sender": "assistant", "content": answer, "timestamp": datetime.now().isoformat()},
                 room=chat_id,
             )
         except Exception:
@@ -582,41 +593,8 @@ def ask(chat_id):
         ):
             data_res, err = execute_tool("aggregate_issues", {"group_by": "status"})
             counts = (data_res or {}).get("counts", []) if not err else []
-            labels = [c["label"] for c in counts][:40]
-            values = [c["value"] for c in counts][:40]
-            total = sum(values) or 1
             chart_type = detect_chart_type(user_message, "status", counts)
-            chart = {
-                "title": "Distribusi Issue (Fallback)",
-                "type": chart_type,
-                "labels": labels,
-                "datasets": [
-                    {
-                        "label": "Jumlah",
-                        "data": values,
-                        "backgroundColor": ["#3b82f6", "#06b6d4", "#8b5cf6", "#f59e0b", "#ef4444"] * (len(values) // 5 + 1),
-                    }
-                ],
-                "meta": {"group_by": "status", "filters": {}, "counts": counts},
-                "notes": "Fallback",
-            }
-            header = "| Label | Jumlah | % |\n| --- | ---: | ---: |"
-            rows = "\n".join(
-                [
-                    f"| {c['label']} | {c['value']} | {round(c['value']*100/total,1)}% |"
-                    for c in counts[:50]
-                ]
-            )
-            top3 = ", ".join(
-                [
-                    f"{c['label']} {c['value']} ({round(c['value']*100/total,1)}%)"
-                    for c in counts[:3]
-                ]
-            )
-            insight = f"Insight: Top {min(3,len(counts))}: {top3}. Total {total} issue."
-            return send(
-                f"```chart\n{json.dumps(chart, ensure_ascii=False)}\n```\n\n{header}\n{rows}\n\n{insight}"
-            )
+            return send(build_chart_markdown(counts, "status", chart_type, chart_title="Distribusi Issue (Fallback)", notes="Fallback"))
         return send(rmsg.content or "Tidak ada jawaban.")
 
     # 4. Handle tool call result
@@ -628,69 +606,12 @@ def ask(chat_id):
         return send(f"❌ Error: {err}")
 
     if fname == "aggregate_issues":
-        labels = [c["label"] for c in data_res["counts"]][:40]
-        values = [c["value"] for c in data_res["counts"]][:40]
-        total = sum(values) or 1
-        chart_type = detect_chart_type(user_message, data_res["group_by"], data_res["counts"])
-        chart = {
-            "title": f"Agg by {data_res['group_by']}",
-            "type": chart_type,
-            "labels": labels,
-            "datasets": [
-                {
-                    "label": "Jumlah",
-                    "data": values,
-                    "backgroundColor": [
-                        "#3b82f6",
-                        "#06b6d4",
-                        "#8b5cf6",
-                        "#f59e0b",
-                        "#ef4444",
-                    ]
-                    * (len(values) // 5 + 1),
-                }
-            ],
-            "meta": {"group_by": data_res["group_by"], "counts": data_res["counts"]},
-            "notes": "Gunakan filter",
-        }
-        header = "| Label | Jumlah | % |\n| --- | ---: | ---: |"
-        rows = "\n".join(
-            [
-                f"| {c['label']} | {c['value']} | {round(c['value']*100/total,1)}% |"
-                for c in data_res["counts"][:100]
-            ]
-        )
-        top3 = ", ".join(
-            [
-                f"{c['label']} {c['value']} ({round(c['value']*100/total,1)}%)"
-                for c in data_res["counts"][:3]
-            ]
-        )
-        insight = (
-            f"Insight: {top3}. Total {data_res['total']} issue."
-            if data_res["counts"]
-            else "Insight: Tidak ada data."
-        )
-        return send(
-            f"```chart\n{json.dumps(chart, ensure_ascii=False)}\n```\n\n{header}\n{rows}\n\n{insight}"
-        )
+        counts = data_res["counts"]
+        chart_type = detect_chart_type(user_message, data_res["group_by"], counts)
+        return send(build_chart_markdown(counts, data_res["group_by"], chart_type))
 
     if fname == "export_worklog_data":
-        # Return the table with embedded download data
-        table_content = data_res.get("table", "No data available")
-        download_link = data_res.get("download_link")
-        filename = data_res.get("filename")
-        
-        if download_link and filename:
-            # Embed download data in a special format for frontend parsing
-            export_data = {
-                "download_link": download_link,
-                "filename": filename
-            }
-            table_with_download = f"{table_content}\n\n[EXPORT_DATA]{json.dumps(export_data)}[/EXPORT_DATA]"
-            return send(table_with_download)
-        else:
-            return send(table_content)
+        return send(build_export_markdown(data_res.get("table", "No data available"), data_res.get("download_link"), data_res.get("filename")))
 
     tool_call_id = call.id
     summarizer_messages = messages_ + [
@@ -761,7 +682,7 @@ def ask_stream(chat_id):
         rmsg = preview.choices[0].message
 
         if getattr(rmsg, "tool_calls", None):
-            socketio.emit("assistant_start", {"chat_id": chat_id}, room=chat_id)
+            socketio.emit("assistant_start", {"chat_id": chat_id, "timestamp": datetime.now().isoformat()}, room=chat_id)
             call = rmsg.tool_calls[0]
             fname = call.function.name
             args = json.loads(call.function.arguments)
@@ -772,96 +693,37 @@ def ask_stream(chat_id):
                 touch_chat(chat_id)
                 socketio.emit(
                     "assistant_end",
-                    {"chat_id": chat_id, "content": answer},
+                    {"chat_id": chat_id, "content": answer, "timestamp": datetime.now().isoformat()},
                     room=chat_id,
                 )
                 return jsonify({"success": True, "streamed": True})
 
             if fname == "aggregate_issues":
-                labels = [c["label"] for c in data_res["counts"]][:40]
-                values = [c["value"] for c in data_res["counts"]][:40]
-                total = sum(values) or 1
-                chart_type = detect_chart_type(user_message, data_res["group_by"], data_res["counts"])
-                chart = {
-                    "title": f"Agg by {data_res['group_by']}",
-                    "type": chart_type,
-                    "labels": labels,
-                    "datasets": [
-                        {
-                            "label": "Jumlah",
-                            "data": values,
-                            "backgroundColor": [
-                                "#3b82f6",
-                                "#06b6d4",
-                                "#8b5cf6",
-                                "#f59e0b",
-                                "#ef4444",
-                            ]
-                            * (len(values) // 5 + 1),
-                        }
-                    ],
-                    "meta": {
-                        "group_by": data_res["group_by"],
-                        "counts": data_res["counts"],
-                    },
-                    "notes": "Gunakan filter",
-                }
-                header = "| Label | Jumlah | % |\n| --- | ---: | ---: |"
-                rows = "\n".join(
-                    [
-                        f"| {c['label']} | {c['value']} | {round(c['value']*100/total,1)}% |"
-                        for c in data_res["counts"][:100]
-                    ]
-                )
-                top3 = ", ".join(
-                    [
-                        f"{c['label']} {c['value']} ({round(c['value']*100/total,1)}%)"
-                        for c in data_res["counts"][:3]
-                    ]
-                )
-                insight = (
-                    f"Insight: {top3}. Total {data_res['total']} issue."
-                    if data_res["counts"]
-                    else "Insight: Tidak ada data."
-                )
-                answer = f"```chart\n{json.dumps(chart, ensure_ascii=False)}\n```\n\n{header}\n{rows}\n\n{insight}"
+                counts = data_res["counts"]
+                chart_type = detect_chart_type(user_message, data_res["group_by"], counts)
+                answer = build_chart_markdown(counts, data_res["group_by"], chart_type)
                 insert_message(chat_id, answer, "assistant")
                 touch_chat(chat_id)
                 socketio.emit(
                     "assistant_end",
-                    {"chat_id": chat_id, "content": answer},
+                    {"chat_id": chat_id, "content": answer, "timestamp": datetime.now().isoformat()},
                     room=chat_id,
                 )
                 return jsonify({"success": True, "streamed": True})
 
             if fname == "export_worklog_data":
-                # Return the table with embedded download data
-                table_content = data_res.get("table", "No data available")
-                download_link = data_res.get("download_link")
-                filename = data_res.get("filename")
-                
-                if download_link and filename:
-                    # Embed download data in a special format for frontend parsing
-                    export_data = {
-                        "download_link": download_link,
-                        "filename": filename
-                    }
-                    table_with_download = f"{table_content}\n\n[EXPORT_DATA]{json.dumps(export_data)}[/EXPORT_DATA]"
-                    insert_message(chat_id, table_with_download, "assistant")
-                    touch_chat(chat_id)
-                    socketio.emit(
-                        "assistant_end",
-                        {"chat_id": chat_id, "content": table_with_download},
-                        room=chat_id,
-                    )
-                else:
-                    insert_message(chat_id, table_content, "assistant")
-                    touch_chat(chat_id)
-                    socketio.emit(
-                        "assistant_end",
-                        {"chat_id": chat_id, "content": table_content},
-                        room=chat_id,
-                    )
+                answer = build_export_markdown(
+                    data_res.get("table", "No data available"),
+                    data_res.get("download_link"),
+                    data_res.get("filename"),
+                )
+                insert_message(chat_id, answer, "assistant")
+                touch_chat(chat_id)
+                socketio.emit(
+                    "assistant_end",
+                    {"chat_id": chat_id, "content": answer, "timestamp": datetime.now().isoformat()},
+                    room=chat_id,
+                )
                 return jsonify({"success": True, "streamed": True})
 
             tool_call_id = call.id
@@ -924,7 +786,7 @@ def ask_stream(chat_id):
                     full.append(delta)
                     socketio.emit(
                         "assistant_delta",
-                        {"chat_id": chat_id, "delta": delta},
+                        {"chat_id": chat_id, "delta": delta, "timestamp": datetime.now().isoformat()},
                         room=chat_id,
                     )
                 answer = "".join(full) or "(kosong)"
@@ -934,11 +796,11 @@ def ask_stream(chat_id):
             insert_message(chat_id, answer, "assistant")
             touch_chat(chat_id)
             socketio.emit(
-                "assistant_end", {"chat_id": chat_id, "content": answer}, room=chat_id
+                "assistant_end", {"chat_id": chat_id, "content": answer, "timestamp": datetime.now().isoformat()}, room=chat_id
             )
             return jsonify({"success": True, "streamed": True})
 
-        socketio.emit("assistant_start", {"chat_id": chat_id}, room=chat_id)
+        socketio.emit("assistant_start", {"chat_id": chat_id, "timestamp": datetime.now().isoformat()}, room=chat_id)
         full = []
         stream = client.chat.completions.create(
             model=get_model_name(),
@@ -955,13 +817,13 @@ def ask_stream(chat_id):
                 continue
             full.append(delta)
             socketio.emit(
-                "assistant_delta", {"chat_id": chat_id, "delta": delta}, room=chat_id
+                "assistant_delta", {"chat_id": chat_id, "delta": delta, "timestamp": datetime.now().isoformat()}, room=chat_id
             )
         answer = "".join(full) or "(kosong)"
         insert_message(chat_id, answer, "assistant")
         touch_chat(chat_id)
         socketio.emit(
-            "assistant_end", {"chat_id": chat_id, "content": answer}, room=chat_id
+            "assistant_end", {"chat_id": chat_id, "content": answer, "timestamp": datetime.now().isoformat()}, room=chat_id
         )
         return jsonify({"success": True, "streamed": True})
     except Exception as e:
@@ -1001,28 +863,8 @@ def ask_new():
 
     conn = sqlite3.connect("maya_tone.db")
     c = conn.cursor()
-    WORDS = [
-        "Orion",
-        "Lumen",
-        "Echo",
-        "Nova",
-        "Aster",
-        "Nimbus",
-        "Quartz",
-        "Atlas",
-        "Zenith",
-        "Pulse",
-        "Vertex",
-        "Cipher",
-        "Delta",
-        "Photon",
-        "Vortex",
-        "Comet",
-        "Helix",
-        "Matrix",
-    ]
     chat_id = str(uuid4())
-    title = f"{random.choice(WORDS)} {random.choice(WORDS)} {datetime.now().strftime('%H:%M')}"
+    title = generate_chat_title()
     c.execute(
         "INSERT INTO chats (id, title, created_at, updated_at, user_id) VALUES (?,?,?,?,?)",
         (chat_id, title, datetime.now(), datetime.now(), "user"),
@@ -1034,7 +876,7 @@ def ask_new():
     try:
         socketio.emit(
             "new_message",
-            {"chat_id": chat_id, "sender": "user", "content": user_message},
+            {"chat_id": chat_id, "sender": "user", "content": user_message, "timestamp": datetime.now().isoformat()},
             room=chat_id,
         )
     except Exception:
@@ -1077,68 +919,15 @@ def ask_new():
             answer = f"❌ Error: {err}"
         else:
             if fname == "aggregate_issues":
-                labels = [c["label"] for c in data_res["counts"]][:40]
-                values = [c["value"] for c in data_res["counts"]][:40]
-                total = sum(values) or 1
-                chart_type = detect_chart_type(user_message, data_res["group_by"], data_res["counts"])
-                chart = {
-                    "title": f"Agg by {data_res['group_by']}",
-                    "type": chart_type,
-                    "labels": labels,
-                    "datasets": [
-                        {
-                            "label": "Jumlah",
-                            "data": values,
-                            "backgroundColor": [
-                                "#3b82f6",
-                                "#06b6d4",
-                                "#8b5cf6",
-                                "#f59e0b",
-                                "#ef4444",
-                            ]
-                            * (len(values) // 5 + 1),
-                        }
-                    ],
-                    "meta": {
-                        "group_by": data_res["group_by"],
-                        "counts": data_res["counts"],
-                    },
-                    "notes": "Gunakan filter",
-                }
-                header = "| Label | Jumlah | % |\n| --- | ---: | ---: |"
-                rows = "\n".join(
-                    [
-                        f"| {c['label']} | {c['value']} | {round(c['value']*100/total,1)}% |"
-                        for c in data_res["counts"][:100]
-                    ]
-                )
-                top3 = ", ".join(
-                    [
-                        f"{c['label']} {c['value']} ({round(c['value']*100/total,1)}%)"
-                        for c in data_res["counts"][:3]
-                    ]
-                )
-                insight = (
-                    f"Insight: {top3}. Total {data_res['total']} issue."
-                    if data_res["counts"]
-                    else "Insight: Tidak ada data."
-                )
-                answer = f"```chart\n{json.dumps(chart, ensure_ascii=False)}\n```\n\n{header}\n{rows}\n\n{insight}"
+                counts = data_res["counts"]
+                chart_type = detect_chart_type(user_message, data_res["group_by"], counts)
+                answer = build_chart_markdown(counts, data_res["group_by"], chart_type)
             elif fname == "export_worklog_data":
-                # Return the table with embedded download data
-                table_content = data_res.get("table", "No data available")
-                download_link = data_res.get("download_link")
-                filename = data_res.get("filename")
-                
-                if download_link and filename:
-                    # Embed download data in a special format for frontend parsing
-                    export_data = {
-                        "download_link": download_link,
-                        "filename": filename
-                    }
-                    answer = f"{table_content}\n\n[EXPORT_DATA]{_json.dumps(export_data)}[/EXPORT_DATA]"
-                else:
-                    answer = table_content
+                answer = build_export_markdown(
+                    data_res.get("table", "No data available"),
+                    data_res.get("download_link"),
+                    data_res.get("filename"),
+                )
             else:
                 tool_call_id = call.id
                 summarizer_messages = messages_ + [
@@ -1175,7 +964,7 @@ def ask_new():
     try:
         socketio.emit(
             "new_message",
-            {"chat_id": chat_id, "sender": "assistant", "content": answer},
+            {"chat_id": chat_id, "sender": "assistant", "content": answer, "timestamp": datetime.now().isoformat()},
             room=chat_id,
         )
     except Exception:
